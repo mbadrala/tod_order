@@ -1,0 +1,22 @@
+# Dependencies
+vendor/
+
+# Applications and Databases
+storage/database.sqlite
+storage/*.sqlite-journal
+storage/*.sqlite-wal
+
+# Development Configuration & Environments
+.env
+.env.local
+.env.*.local
+
+# Server Logs & Cache
+core/var/
+*.log
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
