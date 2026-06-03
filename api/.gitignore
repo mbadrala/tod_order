@@ -6,6 +6,9 @@ storage/database.sqlite
 storage/*.sqlite-journal
 storage/*.sqlite-wal
 
+# Uploaded files
+storage/uploads/*
+
 # Development Configuration & Environments
 .env
 .env.local
