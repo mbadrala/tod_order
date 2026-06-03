@@ -35,6 +35,26 @@ function initializeDatabase(PDO $pdo): void
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            phone TEXT,
+            owner_name TEXT,
+            outdoor_photo TEXT,
+            indoor_photo TEXT,
+            district TEXT,
+            subdistrict TEXT,
+            neighborhood TEXT,
+            building_door TEXT,
+            status TEXT,
+            created_at DATETIME DEFAULT (datetime('now')),
+            updated_at DATETIME DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ");
 }
 
 function seedAdmin(PDO $pdo): void

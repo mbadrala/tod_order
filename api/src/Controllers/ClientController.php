@@ -1,0 +1,133 @@
+<?php
+
+namespace App\Controllers;
+
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+
+class ClientController
+{
+    private \PDO $pdo;
+
+    public function __construct(\PDO $pdo)
+    {
+        $this->pdo = $pdo;
+    }
+
+    public function list(Request $request, Response $response): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC");
+        $stmt->execute([$userId]);
+        return $this->json($response, $stmt->fetchAll());
+    }
+
+    public function get(Request $request, Response $response, array $args): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ? AND user_id = ?");
+        $stmt->execute([$args['id'], $userId]);
+        $client = $stmt->fetch();
+
+        if (!$client) {
+            return $this->json($response, ['error' => 'not found'], 404);
+        }
+
+        return $this->json($response, $client);
+    }
+
+    public function create(Request $request, Response $response): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $body = $request->getParsedBody();
+
+        $name = trim($body['name'] ?? '');
+        if ($name === '') {
+            return $this->json($response, ['error' => 'name is required'], 400);
+        }
+
+        $stmt = $this->pdo->prepare("
+            INSERT INTO clients (user_id, name, phone, owner_name, outdoor_photo, indoor_photo, district, subdistrict, neighborhood, building_door, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $userId,
+            $name,
+            $body['phone'] ?? null,
+            $body['owner_name'] ?? null,
+            $body['outdoor_photo'] ?? null,
+            $body['indoor_photo'] ?? null,
+            $body['district'] ?? null,
+            $body['subdistrict'] ?? null,
+            $body['neighborhood'] ?? null,
+            $body['building_door'] ?? null,
+            $body['status'] ?? null,
+        ]);
+
+        $id = $this->pdo->lastInsertId();
+        $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ?");
+        $stmt->execute([$id]);
+
+        return $this->json($response, $stmt->fetch(), 201);
+    }
+
+    public function update(Request $request, Response $response, array $args): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $body = $request->getParsedBody();
+
+        $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
+        $stmt->execute([$args['id'], $userId]);
+        if (!$stmt->fetch()) {
+            return $this->json($response, ['error' => 'not found'], 404);
+        }
+
+        $fields = ['name', 'phone', 'owner_name', 'outdoor_photo', 'indoor_photo', 'district', 'subdistrict', 'neighborhood', 'building_door', 'status'];
+        $set = [];
+        $params = [];
+
+        foreach ($fields as $f) {
+            if (array_key_exists($f, $body)) {
+                $set[] = "$f = ?";
+                $params[] = $body[$f];
+            }
+        }
+
+        if (empty($set)) {
+            return $this->json($response, ['error' => 'no fields to update'], 400);
+        }
+
+        $set[] = "updated_at = datetime('now')";
+        $params[] = $args['id'];
+        $params[] = $userId;
+
+        $sql = "UPDATE clients SET " . implode(', ', $set) . " WHERE id = ? AND user_id = ?";
+        $this->pdo->prepare($sql)->execute($params);
+
+        $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ?");
+        $stmt->execute([$args['id']]);
+
+        return $this->json($response, $stmt->fetch());
+    }
+
+    public function delete(Request $request, Response $response, array $args): Response
+    {
+        $userId = $request->getAttribute('user_id');
+        $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
+        $stmt->execute([$args['id'], $userId]);
+        if (!$stmt->fetch()) {
+            return $this->json($response, ['error' => 'not found'], 404);
+        }
+
+        $this->pdo->prepare("DELETE FROM clients WHERE id = ? AND user_id = ?")->execute([$args['id'], $userId]);
+        return $this->json($response, ['message' => 'deleted']);
+    }
+
+    private function json(Response $response, array $data, int $status = 200): Response
+    {
+        $response->getBody()->write(json_encode($data));
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus($status);
+    }
+}

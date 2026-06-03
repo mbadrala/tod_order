@@ -1,6 +1,7 @@
 <?php
 
 use App\Controllers\AuthController;
+use App\Controllers\ClientController;
 use App\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -45,6 +46,16 @@ $authController = new AuthController($pdo, $config['jwt_secret']);
 
 $app->post('/auth/register', [$authController, 'register']);
 $app->post('/auth/login', [$authController, 'login']);
+
+$clientController = new ClientController($pdo);
+
+$app->group('/clients', function (RouteCollectorProxy $group) use ($clientController) {
+    $group->get('', [$clientController, 'list']);
+    $group->post('', [$clientController, 'create']);
+    $group->get('/{id}', [$clientController, 'get']);
+    $group->put('/{id}', [$clientController, 'update']);
+    $group->delete('/{id}', [$clientController, 'delete']);
+})->add(new AuthMiddleware($config['jwt_secret']));
 
 $app->group('/files', function (RouteCollectorProxy $group) {
     $group->get('', function (Request $request, Response $response) {
