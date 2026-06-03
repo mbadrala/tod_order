@@ -2,6 +2,7 @@
 
 use App\Controllers\AuthController;
 use App\Controllers\ClientController;
+use App\Controllers\ProductController;
 use App\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -60,6 +61,16 @@ $app->group('/clients', function (RouteCollectorProxy $group) use ($clientContro
     $group->get('/{id}', [$clientController, 'get']);
     $group->put('/{id}', [$clientController, 'update']);
     $group->delete('/{id}', [$clientController, 'delete']);
+})->add(new AuthMiddleware($config['jwt_secret']));
+
+$productController = new ProductController($pdo);
+
+$app->group('/products', function (RouteCollectorProxy $group) use ($productController) {
+    $group->get('', [$productController, 'list']);
+    $group->get('/{id}', [$productController, 'get']);
+    $group->post('', [$productController, 'create']);
+    $group->put('/{id}', [$productController, 'update']);
+    $group->delete('/{id}', [$productController, 'delete']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
 $app->group('/files', function (RouteCollectorProxy $group) {
