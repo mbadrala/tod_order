@@ -19,10 +19,15 @@ class AuthController
 
     public function register(Request $request, Response $response): Response
     {
+        if (!$request->getAttribute('is_admin')) {
+            return $this->json($response, ['error' => 'admin only'], 403);
+        }
+
         $body = $request->getParsedBody();
         $name = trim($body['name'] ?? '');
         $username = trim($body['username'] ?? '');
         $password = $body['password'] ?? '';
+        $isAdmin = !empty($body['is_admin']);
 
         if ($name === '' || $username === '' || $password === '') {
             return $this->json($response, ['error' => 'name, username, and password are required'], 400);
@@ -40,18 +45,68 @@ class AuthController
 
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $stmt = $this->pdo->prepare(
-            "INSERT INTO users (name, username, password_hash) VALUES (?, ?, ?)"
+            "INSERT INTO users (name, username, password_hash, is_admin) VALUES (?, ?, ?, ?)"
         );
-        $stmt->execute([$name, $username, $hash]);
+        $stmt->execute([$name, $username, $hash, $isAdmin ? 1 : 0]);
 
         $userId = $this->pdo->lastInsertId();
-        $token = $this->generateToken($userId, false);
 
         return $this->json($response, [
             'message' => 'User created',
-            'token' => $token,
-            'user' => ['id' => (int)$userId, 'name' => $name, 'username' => $username],
+            'user' => ['id' => (int)$userId, 'name' => $name, 'username' => $username, 'is_admin' => $isAdmin],
         ], 201);
+    }
+
+    public function listUsers(Request $request, Response $response): Response
+    {
+        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, created_at, updated_at FROM users ORDER BY id");
+        return $this->json($response, $stmt->fetchAll());
+    }
+
+    public function updateUser(Request $request, Response $response, array $args): Response
+    {
+        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE id = ?");
+        $stmt->execute([$args['id']]);
+        if (!$stmt->fetch()) {
+            return $this->json($response, ['error' => 'user not found'], 404);
+        }
+
+        $body = $request->getParsedBody();
+        $fields = ['name', 'username'];
+        $set = [];
+        $params = [];
+
+        foreach ($fields as $f) {
+            if (array_key_exists($f, $body)) {
+                $set[] = "$f = ?";
+                $params[] = $body[$f];
+            }
+        }
+
+        if (!empty($body['password'])) {
+            if (strlen($body['password']) < 6) {
+                return $this->json($response, ['error' => 'password must be at least 6 characters'], 400);
+            }
+            $set[] = "password_hash = ?";
+            $params[] = password_hash($body['password'], PASSWORD_BCRYPT);
+        }
+
+        if (array_key_exists('is_admin', $body)) {
+            $set[] = "is_admin = ?";
+            $params[] = $body['is_admin'] ? 1 : 0;
+        }
+
+        if (empty($set)) {
+            return $this->json($response, ['error' => 'no fields to update'], 400);
+        }
+
+        $set[] = "updated_at = datetime('now')";
+        $params[] = $args['id'];
+
+        $this->pdo->prepare("UPDATE users SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);
+
+        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, created_at, updated_at FROM users WHERE id = {$args['id']}");
+        return $this->json($response, $stmt->fetch());
     }
 
     public function login(Request $request, Response $response): Response

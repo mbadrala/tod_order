@@ -16,19 +16,33 @@ class ClientController
 
     public function list(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('user_id');
-        $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC");
-        $stmt->execute([$userId]);
+        $isAdmin = $request->getAttribute('is_admin');
+
+        if ($isAdmin) {
+            $stmt = $this->pdo->query("SELECT * FROM clients ORDER BY created_at DESC");
+        } else {
+            $userId = $request->getAttribute('user_id');
+            $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC");
+            $stmt->execute([$userId]);
+        }
+
         return $this->json($response, $stmt->fetchAll());
     }
 
     public function get(Request $request, Response $response, array $args): Response
     {
+        $isAdmin = $request->getAttribute('is_admin');
         $userId = $request->getAttribute('user_id');
-        $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ? AND user_id = ?");
-        $stmt->execute([$args['id'], $userId]);
-        $client = $stmt->fetch();
 
+        if ($isAdmin) {
+            $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ?");
+            $stmt->execute([$args['id']]);
+        } else {
+            $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ? AND user_id = ?");
+            $stmt->execute([$args['id'], $userId]);
+        }
+
+        $client = $stmt->fetch();
         if (!$client) {
             return $this->json($response, ['error' => 'not found'], 404);
         }
@@ -73,11 +87,18 @@ class ClientController
 
     public function update(Request $request, Response $response, array $args): Response
     {
+        $isAdmin = $request->getAttribute('is_admin');
         $userId = $request->getAttribute('user_id');
         $body = $request->getParsedBody();
 
-        $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
-        $stmt->execute([$args['id'], $userId]);
+        if ($isAdmin) {
+            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ?");
+            $stmt->execute([$args['id']]);
+        } else {
+            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
+            $stmt->execute([$args['id'], $userId]);
+        }
+
         if (!$stmt->fetch()) {
             return $this->json($response, ['error' => 'not found'], 404);
         }
@@ -99,10 +120,8 @@ class ClientController
 
         $set[] = "updated_at = datetime('now')";
         $params[] = $args['id'];
-        $params[] = $userId;
 
-        $sql = "UPDATE clients SET " . implode(', ', $set) . " WHERE id = ? AND user_id = ?";
-        $this->pdo->prepare($sql)->execute($params);
+        $this->pdo->prepare("UPDATE clients SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);
 
         $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ?");
         $stmt->execute([$args['id']]);
@@ -112,14 +131,22 @@ class ClientController
 
     public function delete(Request $request, Response $response, array $args): Response
     {
+        $isAdmin = $request->getAttribute('is_admin');
         $userId = $request->getAttribute('user_id');
-        $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
-        $stmt->execute([$args['id'], $userId]);
+
+        if ($isAdmin) {
+            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ?");
+            $stmt->execute([$args['id']]);
+        } else {
+            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
+            $stmt->execute([$args['id'], $userId]);
+        }
+
         if (!$stmt->fetch()) {
             return $this->json($response, ['error' => 'not found'], 404);
         }
 
-        $this->pdo->prepare("DELETE FROM clients WHERE id = ? AND user_id = ?")->execute([$args['id'], $userId]);
+        $this->pdo->prepare("DELETE FROM clients WHERE id = ?")->execute([$args['id']]);
         return $this->json($response, ['message' => 'deleted']);
     }
 

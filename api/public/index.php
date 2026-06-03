@@ -44,8 +44,13 @@ $app->addErrorMiddleware(true, true, true);
 
 $authController = new AuthController($pdo, $config['jwt_secret']);
 
-$app->post('/auth/register', [$authController, 'register']);
 $app->post('/auth/login', [$authController, 'login']);
+
+$app->group('/auth', function (RouteCollectorProxy $group) use ($authController) {
+    $group->post('/register', [$authController, 'register']);
+    $group->get('/users', [$authController, 'listUsers']);
+    $group->put('/users/{id}', [$authController, 'updateUser']);
+})->add(new AuthMiddleware($config['jwt_secret']));
 
 $clientController = new ClientController($pdo);
 
