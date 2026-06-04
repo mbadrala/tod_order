@@ -124,6 +124,15 @@ export async function deleteProduct(id: number) {
   return request<{ message: string }>(`/products/${id}`, { method: 'DELETE' })
 }
 
+export interface SaleBankAllocation {
+  id: number
+  sale_id: number
+  bank_account_id: number
+  bank_name: string
+  account_number: string
+  amount: number
+}
+
 export interface Sale {
   id: number
   sale_date: string
@@ -137,6 +146,7 @@ export interface Sale {
   created_at: string
   updated_at: string
   items: SaleItem[]
+  bank_allocations: SaleBankAllocation[]
 }
 
 export interface SaleItem {
@@ -155,11 +165,18 @@ export interface SaleInput {
   client_name?: string | null
   client_phone?: string | null
   slip_number?: string | null
+  status?: string
   items: Array<{
     product_code: string
     product_name: string
     amount: number
     unit_price: number
+  }>
+  bank_allocations?: Array<{
+    bank_account_id: number
+    bank_name: string
+    account_number: string
+    amount: number
   }>
 }
 

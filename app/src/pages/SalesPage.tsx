@@ -14,7 +14,7 @@ import { Dialog, DialogPortal, DialogBackdrop, DialogPopup, DialogTitle, DialogC
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DatePicker } from '@/components/ui/date-picker'
 import { ClientSelect } from '@/components/ui/client-select'
-import { getSales, createSale, updateSale, deleteSale, getProducts, getClients, type Sale, type Product, type Client } from '@/lib/api'
+import { getSales, createSale, updateSale, deleteSale, getProducts, getClients, getBankAccounts, type Sale, type Product, type Client, type BankAccount } from '@/lib/api'
 
 interface LineItemForm {
   product_code: string
@@ -23,12 +23,20 @@ interface LineItemForm {
   unit_price: number
 }
 
+interface BankAllocForm {
+  bank_account_id: number
+  bank_name: string
+  account_number: string
+  amount: number
+}
+
 const emptyLine = (): LineItemForm => ({ product_code: '', product_name: '', amount: 1, unit_price: 0 })
 
 function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [sorting, setSorting] = useState<SortingState>([{ id: 'sale_date', desc: true }])
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
@@ -38,16 +46,18 @@ function SalesPage() {
   const [clientPhone, setClientPhone] = useState('')
   const [slipNumber, setSlipNumber] = useState('')
   const [items, setItems] = useState<LineItemForm[]>([emptyLine()])
+  const [allocations, setAllocations] = useState<BankAllocForm[]>([])
   const [error, setError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
   const isAdmin = JSON.parse(localStorage.getItem('user') || '{}').is_admin
 
   const load = async () => {
     try {
-      const [s, p, c] = await Promise.all([getSales(), getProducts(), getClients()])
+      const [s, p, c, b] = await Promise.all([getSales(), getProducts(), getClients(), getBankAccounts()])
       setSales(s)
       setProducts(p)
       setClients(c)
+      setBankAccounts(b)
     } catch { /* ignore */ }
   }
 
@@ -60,6 +70,7 @@ function SalesPage() {
     setClientPhone('')
     setSlipNumber('')
     setItems([emptyLine()])
+    setAllocations([])
     setEditId(null)
     setError('')
   }
@@ -75,6 +86,12 @@ function SalesPage() {
       product_name: i.product_name,
       amount: i.amount,
       unit_price: i.unit_price,
+    })))
+    setAllocations((s.bank_allocations || []).map((a) => ({
+      bank_account_id: a.bank_account_id,
+      bank_name: a.bank_name,
+      account_number: a.account_number,
+      amount: a.amount,
     })))
     setEditId(s.id)
     setError('')
@@ -106,9 +123,22 @@ function SalesPage() {
     })
   }
 
+  const updateAllocation = (idx: number, value: number) => {
+    setAllocations((prev) => {
+      const next = [...prev]
+      next[idx] = { ...next[idx], amount: value }
+      return next
+    })
+  }
+
   const totalSum = useMemo(() =>
     items.reduce((sum, item) => sum + item.amount * item.unit_price, 0),
     [items]
+  )
+
+  const allocTotal = useMemo(() =>
+    allocations.reduce((sum, a) => sum + (a.amount || 0), 0),
+    [allocations]
   )
 
   const dateStr = useMemo(() => {
@@ -125,6 +155,10 @@ function SalesPage() {
       setError('Дор хаяж нэг бараа оруулна уу')
       return
     }
+    if (status === 'final' && allocTotal < totalSum) {
+      setError('Банкны хуваарилалтын дүн нийт дүнгээс бага байна')
+      return
+    }
     try {
       const payload = {
         sale_date: dateStr,
@@ -138,6 +172,12 @@ function SalesPage() {
           product_name: i.product_name,
           amount: i.amount,
           unit_price: i.unit_price,
+        })),
+        bank_allocations: allocations.filter((a) => a.amount > 0).map((a) => ({
+          bank_account_id: a.bank_account_id,
+          bank_name: a.bank_name,
+          account_number: a.account_number,
+          amount: a.amount,
         })),
       }
       if (editId) {
@@ -356,6 +396,56 @@ function SalesPage() {
                   Нийт дүн: {totalSum.toLocaleString('mn-MN')} ₮
                 </div>
               </div>
+            </div>
+
+            <Separator className="my-4" />
+
+            <div>
+              <p className="mb-2 text-sm font-medium">Банкны хуваарилалт</p>
+              <p className="mb-3 text-xs text-muted-foreground">Нийт дүнг банкны дансууд руу хуваарилах</p>
+              <div className="space-y-2">
+                {bankAccounts.map((ba) => {
+                  const alloc = allocations.find((a) => a.bank_account_id === ba.id)
+                  return (
+                    <div key={ba.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{ba.bank_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{ba.account_number}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input type="number" min="0" step="100"
+                          value={alloc?.amount ?? 0}
+                          onChange={(e) => {
+                            const val = Number(e.target.value)
+                            if (alloc) {
+                              updateAllocation(allocations.indexOf(alloc), val)
+                            } else {
+                              setAllocations((prev) => [...prev, {
+                                bank_account_id: ba.id,
+                                bank_name: ba.bank_name,
+                                account_number: ba.account_number,
+                                amount: val,
+                              }])
+                            }
+                          }}
+                          className="w-28 rounded border px-2 py-1.5 text-right text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 tabular-nums"
+                        />
+                        <span className="text-xs text-muted-foreground">₮</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {bankAccounts.length > 0 && (
+                <div className="mt-3 flex justify-end border-t pt-3">
+                  <div className={`text-sm font-semibold tabular-nums ${allocTotal < totalSum ? 'text-destructive' : ''}`}>
+                    Хуваарилалт: {allocTotal.toLocaleString('mn-MN')} ₮
+                    {allocTotal < totalSum && (
+                      <span className="ml-2 text-xs font-normal">({(totalSum - allocTotal).toLocaleString('mn-MN')} ₮ дутуу)</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {error && <p className="mt-3 text-sm text-destructive">{error}</p>}

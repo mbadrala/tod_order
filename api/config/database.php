@@ -127,6 +127,18 @@ function initializeDatabase(PDO $pdo): void
             updated_at DATETIME DEFAULT (datetime('now'))
         )
     ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sale_bank_allocations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            bank_account_id INTEGER NOT NULL,
+            bank_name TEXT NOT NULL,
+            account_number TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+        )
+    ");
 }
 
 function seedAdmin(PDO $pdo): void

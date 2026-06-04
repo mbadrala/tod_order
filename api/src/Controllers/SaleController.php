@@ -22,17 +22,26 @@ class SaleController
         if (!empty($sales)) {
             $ids = array_column($sales, 'id');
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
             $stmt = $this->pdo->prepare("SELECT * FROM sale_items WHERE sale_id IN ($placeholders) ORDER BY id");
             $stmt->execute($ids);
             $allItems = $stmt->fetchAll();
-
             $itemsBySale = [];
             foreach ($allItems as $item) {
                 $itemsBySale[$item['sale_id']][] = $item;
             }
 
+            $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id IN ($placeholders) ORDER BY id");
+            $stmt->execute($ids);
+            $allAllocs = $stmt->fetchAll();
+            $allocsBySale = [];
+            foreach ($allAllocs as $a) {
+                $allocsBySale[$a['sale_id']][] = $a;
+            }
+
             foreach ($sales as &$sale) {
                 $sale['items'] = $itemsBySale[$sale['id']] ?? [];
+                $sale['bank_allocations'] = $allocsBySale[$sale['id']] ?? [];
             }
             unset($sale);
         }
@@ -54,6 +63,10 @@ class SaleController
         $stmt->execute([$args['id']]);
         $sale['items'] = $stmt->fetchAll();
 
+        $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id = ? ORDER BY id");
+        $stmt->execute([$args['id']]);
+        $sale['bank_allocations'] = $stmt->fetchAll();
+
         return $this->json($response, $sale);
     }
 
@@ -69,6 +82,7 @@ class SaleController
         $slipNumber = trim($body['slip_number'] ?? '');
         $status = $body['status'] ?? 'final';
         $items = $body['items'] ?? [];
+        $bankAllocations = $body['bank_allocations'] ?? [];
 
         if ($slipNumber === '') {
             return $this->json($response, ['error' => 'slip number is required'], 400);
@@ -86,6 +100,20 @@ class SaleController
             $totalAmount += $item['sum_price'];
         }
         unset($item);
+
+        $allocTotal = 0;
+        if (is_array($bankAllocations)) {
+            foreach ($bankAllocations as &$a) {
+                $aAmount = (float)($a['amount'] ?? 0);
+                $allocTotal += $aAmount;
+                $a['amount'] = $aAmount;
+            }
+            unset($a);
+        }
+
+        if ($status === 'final' && $allocTotal < $totalAmount) {
+            return $this->json($response, ['error' => 'Банкны хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+        }
 
         $this->pdo->beginTransaction();
         try {
@@ -111,6 +139,22 @@ class SaleController
                 ]);
             }
 
+            if (is_array($bankAllocations) && !empty($bankAllocations)) {
+                $stmt = $this->pdo->prepare("
+                    INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, amount)
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                foreach ($bankAllocations as $a) {
+                    $stmt->execute([
+                        $saleId,
+                        $a['bank_account_id'],
+                        $a['bank_name'] ?? '',
+                        $a['account_number'] ?? '',
+                        $a['amount'],
+                    ]);
+                }
+            }
+
             $this->pdo->commit();
 
             $stmt = $this->pdo->prepare("SELECT * FROM sales WHERE id = ?");
@@ -120,6 +164,10 @@ class SaleController
             $stmt = $this->pdo->prepare("SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id");
             $stmt->execute([$saleId]);
             $sale['items'] = $stmt->fetchAll();
+
+            $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id = ? ORDER BY id");
+            $stmt->execute([$saleId]);
+            $sale['bank_allocations'] = $stmt->fetchAll();
 
             return $this->json($response, $sale, 201);
         } catch (\Exception $e) {
@@ -157,6 +205,8 @@ class SaleController
         }
 
         $items = $body['items'] ?? null;
+        $bankAllocations = $body['bank_allocations'] ?? null;
+
         if ($items !== null) {
             if (!is_array($items) || empty($items)) {
                 return $this->json($response, ['error' => 'at least one item is required'], 400);
@@ -170,6 +220,22 @@ class SaleController
                 $totalAmount += $item['sum_price'];
             }
             unset($item);
+
+            $status = $body['status'] ?? $sale['status'] ?? 'final';
+
+            $allocTotal = 0;
+            if (is_array($bankAllocations)) {
+                foreach ($bankAllocations as &$a) {
+                    $aAmount = (float)($a['amount'] ?? 0);
+                    $allocTotal += $aAmount;
+                    $a['amount'] = $aAmount;
+                }
+                unset($a);
+            }
+
+            if ($status === 'final' && $allocTotal < $totalAmount) {
+                return $this->json($response, ['error' => 'Банкны хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+            }
 
             $set[] = "total_amount = ?";
             $params[] = $totalAmount;
@@ -192,9 +258,68 @@ class SaleController
                         $item['sum_price'],
                     ]);
                 }
+
+                $this->pdo->prepare("DELETE FROM sale_bank_allocations WHERE sale_id = ?")->execute([$args['id']]);
+
+                if (is_array($bankAllocations) && !empty($bankAllocations)) {
+                    $stmtAlloc = $this->pdo->prepare("
+                        INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, amount)
+                        VALUES (?, ?, ?, ?, ?)
+                    ");
+                    foreach ($bankAllocations as $a) {
+                        $stmtAlloc->execute([
+                            $args['id'],
+                            $a['bank_account_id'],
+                            $a['bank_name'] ?? '',
+                            $a['account_number'] ?? '',
+                            $a['amount'],
+                        ]);
+                    }
+                }
             } catch (\Exception $e) {
                 $this->pdo->rollBack();
                 return $this->json($response, ['error' => 'update failed'], 500);
+            }
+        } else {
+            $status = $body['status'] ?? $sale['status'] ?? 'final';
+
+            if ($bankAllocations !== null && $status === 'final') {
+                $allocTotal = 0;
+                if (is_array($bankAllocations)) {
+                    foreach ($bankAllocations as &$a) {
+                        $aAmount = (float)($a['amount'] ?? 0);
+                        $allocTotal += $aAmount;
+                        $a['amount'] = $aAmount;
+                    }
+                    unset($a);
+                }
+
+                $stmt = $this->pdo->prepare("SELECT total_amount FROM sales WHERE id = ?");
+                $stmt->execute([$args['id']]);
+                $existing = $stmt->fetch();
+                $existingTotal = (float)($existing['total_amount'] ?? 0);
+
+                if ($allocTotal < $existingTotal) {
+                    return $this->json($response, ['error' => 'Банкны хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+                }
+
+                $this->pdo->prepare("DELETE FROM sale_bank_allocations WHERE sale_id = ?")->execute([$args['id']]);
+
+                if (is_array($bankAllocations) && !empty($bankAllocations)) {
+                    $stmtAlloc = $this->pdo->prepare("
+                        INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, amount)
+                        VALUES (?, ?, ?, ?, ?)
+                    ");
+                    foreach ($bankAllocations as $a) {
+                        $stmtAlloc->execute([
+                            $args['id'],
+                            $a['bank_account_id'],
+                            $a['bank_name'] ?? '',
+                            $a['account_number'] ?? '',
+                            $a['amount'],
+                        ]);
+                    }
+                }
             }
         }
 
@@ -216,6 +341,10 @@ class SaleController
         $stmt->execute([$args['id']]);
         $sale['items'] = $stmt->fetchAll();
 
+        $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id = ? ORDER BY id");
+        $stmt->execute([$args['id']]);
+        $sale['bank_allocations'] = $stmt->fetchAll();
+
         return $this->json($response, $sale);
     }
 
@@ -231,6 +360,7 @@ class SaleController
             return $this->json($response, ['error' => 'not found'], 404);
         }
 
+        $this->pdo->prepare("DELETE FROM sale_bank_allocations WHERE sale_id = ?")->execute([$args['id']]);
         $this->pdo->prepare("DELETE FROM sale_items WHERE sale_id = ?")->execute([$args['id']]);
         $this->pdo->prepare("DELETE FROM sales WHERE id = ?")->execute([$args['id']]);
 
