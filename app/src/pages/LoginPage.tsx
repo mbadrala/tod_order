@@ -1,41 +1,50 @@
-import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { login } from '@/lib/api'
+import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { login } from "@/lib/api";
 
 function LoginPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      const data = await login(username, password)
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      navigate('/')
+      const data = await login(username, password);
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      navigate("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Нэвтрэхэд алдаа гарлаа')
+      setError(err instanceof Error ? err.message : "Нэвтрэхэд алдаа гарлаа");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-svh items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border p-6 shadow-sm">
         <div className="mb-6 flex justify-center">
-          <img src="/logo.png" alt="Logo" className="h-16 w-auto" />
+          <img src="/logo.png" alt="Logo" className="h-34 w-auto" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="username" className="mb-1 block text-sm font-medium">
+            <label
+              htmlFor="username"
+              className="mb-1 block text-sm font-medium"
+            >
               Нэвтрэх нэр
             </label>
             <input
@@ -50,7 +59,10 @@ function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium">
+            <label
+              htmlFor="password"
+              className="mb-1 block text-sm font-medium"
+            >
               Нууц үг
             </label>
             <input
@@ -64,17 +76,15 @@ function LoginPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Түр хүлээнэ үү...' : 'Нэвтрэх'}
+            {loading ? "Түр хүлээнэ үү..." : "Нэвтрэх"}
           </Button>
         </form>
       </div>
     </div>
-  )
+  );
 }
 
-export default LoginPage
+export default LoginPage;
