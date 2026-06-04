@@ -8,7 +8,7 @@ function navItems(isAdmin: boolean) {
   const items = [
     { label: "Нүүр", path: "/" },
     { label: "Харилцагчид", path: "/clients" },
-    { label: "Бүтээгдэхүүн", path: "/products" },
+    { label: "Бараа", path: "/products" },
   ]
   if (isAdmin) items.push({ label: "Хэрэглэгчид", path: "/users" })
   return items

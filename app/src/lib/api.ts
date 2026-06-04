@@ -94,6 +94,36 @@ export async function uploadFile(file: File) {
   return data as { id: number; url: string; original_name: string; mime_type: string; size: number }
 }
 
+export interface Product {
+  id: number
+  code: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export type ProductInput = { code: string; name: string }
+
+export async function getProducts() {
+  return request<Product[]>('/products')
+}
+
+export async function getProduct(id: number) {
+  return request<Product>(`/products/${id}`)
+}
+
+export async function createProduct(data: ProductInput) {
+  return request<Product>('/products', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function updateProduct(id: number, data: Partial<ProductInput>) {
+  return request<Product>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export async function deleteProduct(id: number) {
+  return request<{ message: string }>(`/products/${id}`, { method: 'DELETE' })
+}
+
 export function getFileUrl(id: number | string | null | undefined): string | null {
   if (!id) return null
   const token = localStorage.getItem('token')

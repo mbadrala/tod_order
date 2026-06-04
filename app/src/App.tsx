@@ -4,9 +4,9 @@ import AdminRoute from './components/AdminRoute'
 import DashboardLayout from './components/DashboardLayout'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
-import AboutPage from './pages/AboutPage'
 import UsersPage from './pages/UsersPage'
 import ClientsPage from './pages/ClientsPage'
+import ProductsPage from './pages/ProductsPage'
 
 function App() {
   return (
@@ -20,9 +20,8 @@ function App() {
         }
       >
         <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
         <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/products" element={<div className="p-8 text-center text-muted-foreground">Удахгүй</div>} />
+        <Route path="/products" element={<ProductsPage />} />
         <Route
           path="/users"
           element={

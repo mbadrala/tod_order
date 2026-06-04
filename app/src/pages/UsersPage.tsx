@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { getUsers, createUser, updateUser, deleteUser } from '@/lib/api'
 
 interface User {
@@ -19,6 +20,7 @@ function UsersPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
 
   const load = async () => {
     try {
@@ -70,11 +72,17 @@ function UsersPage() {
   }
 
   const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`${name} хэрэглэгчийг устгах уу?`)) return
+    setDeleteTarget({ id, name })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await deleteUser(id)
+      await deleteUser(deleteTarget.id)
+      setDeleteTarget(null)
       await load()
     } catch (err) {
+      setDeleteTarget(null)
       setError(err instanceof Error ? err.message : 'Алдаа гарлаа')
     }
   }
@@ -177,6 +185,13 @@ function UsersPage() {
           </tbody>
         </table>
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(v) => { if (!v) setDeleteTarget(null) }}
+        title="Хэрэглэгч устгах"
+        message={`${deleteTarget?.name ?? ''} хэрэглэгчийг устгах уу?`}
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }

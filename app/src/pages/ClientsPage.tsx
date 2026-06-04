@@ -1,17 +1,29 @@
 import { useEffect, useState, useRef } from 'react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  type SortingState,
+  type ColumnDef,
+} from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Dialog, DialogPortal, DialogBackdrop, DialogPopup, DialogTitle, DialogClose } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { getClients, createClient, updateClient, deleteClient, uploadFile, getFileUrl, type Client, type ClientInput } from '@/lib/api'
 
 function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'created_at', desc: true }])
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<ClientInput>({})
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
 
   const load = async () => {
     try { setClients(await getClients()) } catch { /* ignore */ }
@@ -90,14 +102,114 @@ function ClientsPage() {
   }
 
   const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`"${name}"-г устгах уу?`)) return
+    setDeleteTarget({ id, name })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await deleteClient(id)
+      await deleteClient(deleteTarget.id)
+      setDeleteTarget(null)
       await load()
     } catch (err) {
+      setDeleteTarget(null)
       setError(err instanceof Error ? err.message : 'Алдаа гарлаа')
     }
   }
+
+  const columns: ColumnDef<Client>[] = [
+    {
+      accessorKey: 'client_code',
+      header: 'Код',
+      cell: ({ getValue }) => (
+        <span className="font-mono text-xs">{String(getValue() ?? '-')}</span>
+      ),
+    },
+    {
+      accessorKey: 'name',
+      header: 'Нэр',
+      cell: ({ getValue }) => (
+        <span className="font-medium">{String(getValue())}</span>
+      ),
+    },
+    {
+      accessorKey: 'phone',
+      header: 'Утас',
+      cell: ({ getValue }) => String(getValue() ?? '-'),
+    },
+    {
+      accessorKey: 'owner_name',
+      header: 'Эзэмшигч',
+      cell: ({ getValue }) => String(getValue() ?? '-'),
+    },
+    {
+      accessorKey: 'district',
+      header: 'Дүүрэг',
+      cell: ({ getValue }) => String(getValue() ?? '-'),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Төлөв',
+      cell: ({ getValue }) => {
+        const v = getValue()
+        if (v === 'active') return <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">Идэвхтэй</span>
+        if (v === 'inactive') return <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">Идэвхгүй</span>
+        return '-'
+      },
+    },
+    {
+      id: 'outdoor_photo',
+      header: 'Гадна зураг',
+      cell: ({ row }) => {
+        const val = row.original.outdoor_photo
+        return val ? (
+          <img src={getFileUrl(val) || ''} alt="Гадна"
+            className="h-10 w-10 cursor-pointer rounded border object-cover hover:opacity-80"
+            onClick={() => setPreviewUrl(getFileUrl(val))} />
+        ) : '-'
+      },
+    },
+    {
+      id: 'indoor_photo',
+      header: 'Дотор зураг',
+      cell: ({ row }) => {
+        const val = row.original.indoor_photo
+        return val ? (
+          <img src={getFileUrl(val) || ''} alt="Дотор"
+            className="h-10 w-10 cursor-pointer rounded border object-cover hover:opacity-80"
+            onClick={() => setPreviewUrl(getFileUrl(val))} />
+        ) : '-'
+      },
+    },
+    {
+      accessorKey: 'created_at',
+      header: 'Огноо',
+      cell: ({ getValue }) => {
+        const v = getValue() as string | null
+        return v ? new Date(v).toLocaleDateString('mn-MN') : '-'
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Үйлдэл',
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          <Button variant="outline" size="xs" onClick={() => openEdit(row.original)}>Засах</Button>
+          <Button variant="outline" size="xs" className="text-destructive"
+            onClick={() => handleDelete(row.original.id, row.original.name)}>Устгах</Button>
+        </div>
+      ),
+    },
+  ]
+
+  const table = useReactTable({
+    data: clients,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -176,70 +288,50 @@ function ClientsPage() {
       </Dialog>
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="min-w-[900px]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/50 text-left">
-                <th className="px-4 py-3 font-medium">Код</th>
-                <th className="px-4 py-3 font-medium">Нэр</th>
-                <th className="px-4 py-3 font-medium">Утас</th>
-                <th className="px-4 py-3 font-medium">Эзэмшигч</th>
-                <th className="px-4 py-3 font-medium">Дүүрэг</th>
-                <th className="px-4 py-3 font-medium">Төлөв</th>
-                <th className="px-4 py-3 font-medium">Гадна зураг</th>
-                <th className="px-4 py-3 font-medium">Дотор зураг</th>
-                <th className="px-4 py-3 font-medium">Огноо</th>
-                <th className="px-4 py-3 font-medium">Үйлдэл</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.length === 0 && (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">Одоогоор харилцагч байхгүй</td></tr>
-              )}
-              {clients.map((c) => (
-                <tr key={c.id} className="border-t">
-                  <td className="px-4 py-3 font-mono text-xs">{c.client_code || '-'}</td>
-                  <td className="px-4 py-3 font-medium">{c.name}</td>
-                  <td className="px-4 py-3">{c.phone || '-'}</td>
-                  <td className="px-4 py-3">{c.owner_name || '-'}</td>
-                  <td className="px-4 py-3">{c.district || '-'}</td>
-                  <td className="px-4 py-3">
-                    {c.status === 'active' ? (
-                      <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">Идэвхтэй</span>
-                    ) : c.status === 'inactive' ? (
-                      <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">Идэвхгүй</span>
-                    ) : '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {c.outdoor_photo ? (
-                      <img src={getFileUrl(c.outdoor_photo) || ''} alt="Гадна"
-                        className="h-10 w-10 cursor-pointer rounded border object-cover hover:opacity-80"
-                        onClick={() => setPreviewUrl(getFileUrl(c.outdoor_photo))} />
-                    ) : '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {c.indoor_photo ? (
-                      <img src={getFileUrl(c.indoor_photo) || ''} alt="Дотор"
-                        className="h-10 w-10 cursor-pointer rounded border object-cover hover:opacity-80"
-                        onClick={() => setPreviewUrl(getFileUrl(c.indoor_photo))} />
-                    ) : '-'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                    {c.created_at ? new Date(c.created_at).toLocaleDateString('mn-MN') : '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="xs" onClick={() => openEdit(c)}>Засах</Button>
-                      <Button variant="outline" size="xs" className="text-destructive"
-                        onClick={() => handleDelete(c.id, c.name)}>Устгах</Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((header) => (
+                  <TableHead key={header.id}
+                    className={header.column.getCanSort() ? 'cursor-pointer select-none hover:text-foreground/80' : ''}
+                    onClick={header.column.getToggleSortingHandler()}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    {{ asc: ' ▲', desc: ' ▼' }[header.column.getIsSorted() as string] ?? ''}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="py-8 text-center text-muted-foreground">
+                  Одоогоор харилцагч байхгүй
+                </TableCell>
+              </TableRow>
+            ) : (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(v) => { if (!v) setDeleteTarget(null) }}
+        title="Харилцагч устгах"
+        message={`"${deleteTarget?.name ?? ''}"-г устгах уу?`}
+        onConfirm={confirmDelete}
+      />
 
       {previewUrl && (
         <Dialog open={true} onOpenChange={(v) => { if (!v) setPreviewUrl(null) }}>
