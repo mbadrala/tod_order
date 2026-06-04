@@ -64,6 +64,13 @@ class AuthController
 
     public function updateUser(Request $request, Response $response, array $args): Response
     {
+        $isAdmin = $request->getAttribute('is_admin');
+        $userId = $request->getAttribute('user_id');
+
+        if (!$isAdmin && (int)$args['id'] !== (int)$userId) {
+            return $this->json($response, ['error' => 'admin only'], 403);
+        }
+
         $stmt = $this->pdo->prepare("SELECT id FROM users WHERE id = ?");
         $stmt->execute([$args['id']]);
         if (!$stmt->fetch()) {
@@ -105,6 +112,10 @@ class AuthController
 
     public function deleteUser(Request $request, Response $response, array $args): Response
     {
+        if (!$request->getAttribute('is_admin')) {
+            return $this->json($response, ['error' => 'admin only'], 403);
+        }
+
         $stmt = $this->pdo->prepare("SELECT id, is_admin FROM users WHERE id = ?");
         $stmt->execute([$args['id']]);
         $user = $stmt->fetch();
