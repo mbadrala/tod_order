@@ -47,6 +47,7 @@ export async function deleteUser(id: number) {
 export interface Client {
   id: number
   user_id: number
+  client_code: string | null
   name: string
   phone: string | null
   owner_name: string | null
@@ -95,5 +96,7 @@ export async function uploadFile(file: File) {
 
 export function getFileUrl(id: number | string | null | undefined): string | null {
   if (!id) return null
-  return `${API_BASE}/files/${id}`
+  const token = localStorage.getItem('token')
+  const params = token ? `?token=${encodeURIComponent(token)}` : ''
+  return `${API_BASE}/files/${id}${params}`
 }

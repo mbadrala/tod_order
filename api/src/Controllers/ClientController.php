@@ -60,12 +60,22 @@ class ClientController
             return $this->json($response, ['error' => 'name is required'], 400);
         }
 
+        $clientCode = $body['client_code'] ?? null;
+        if ($clientCode !== null && $clientCode !== '') {
+            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE client_code = ?");
+            $stmt->execute([$clientCode]);
+            if ($stmt->fetch()) {
+                return $this->json($response, ['error' => 'Код бүртгэлтэй байна'], 409);
+            }
+        }
+
         $stmt = $this->pdo->prepare("
-            INSERT INTO clients (user_id, name, phone, owner_name, outdoor_photo, indoor_photo, district, subdistrict, neighborhood, building_door, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clients (user_id, client_code, name, phone, owner_name, outdoor_photo, indoor_photo, district, subdistrict, neighborhood, building_door, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $userId,
+            $clientCode ?: null,
             $name,
             $body['phone'] ?? null,
             $body['owner_name'] ?? null,
@@ -103,7 +113,7 @@ class ClientController
             return $this->json($response, ['error' => 'not found'], 404);
         }
 
-        $fields = ['name', 'phone', 'owner_name', 'outdoor_photo', 'indoor_photo', 'district', 'subdistrict', 'neighborhood', 'building_door', 'status'];
+        $fields = ['name', 'phone', 'owner_name', 'outdoor_photo', 'indoor_photo', 'district', 'subdistrict', 'neighborhood', 'building_door', 'status', 'client_code'];
         $set = [];
         $params = [];
 
@@ -116,6 +126,14 @@ class ClientController
 
         if (empty($set)) {
             return $this->json($response, ['error' => 'no fields to update'], 400);
+        }
+
+        if (array_key_exists('client_code', $body) && $body['client_code'] !== null && $body['client_code'] !== '') {
+            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE client_code = ? AND id != ?");
+            $stmt->execute([$body['client_code'], $args['id']]);
+            if ($stmt->fetch()) {
+                return $this->json($response, ['error' => 'Код бүртгэлтэй байна'], 409);
+            }
         }
 
         $set[] = "updated_at = datetime('now')";

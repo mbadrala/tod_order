@@ -11,6 +11,7 @@ function ClientsPage() {
   const [form, setForm] = useState<ClientInput>({})
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const load = async () => {
     try { setClients(await getClients()) } catch { /* ignore */ }
@@ -26,6 +27,7 @@ function ClientsPage() {
 
   const openEdit = (c: Client) => {
     setForm({
+      client_code: c.client_code || '',
       name: c.name,
       phone: c.phone || '',
       owner_name: c.owner_name || '',
@@ -115,8 +117,10 @@ function ClientsPage() {
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground">Үндсэн мэдээлэл</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <input placeholder="Код" value={form.client_code || ''} onChange={(e) => set('client_code', e.target.value)}
+                    className="rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
                   <input placeholder="Нэр *" value={form.name || ''} onChange={(e) => set('name', e.target.value)}
-                    className="col-span-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
+                    className="rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
                   <input placeholder="Утас" value={form.phone || ''} onChange={(e) => set('phone', e.target.value)}
                     className="rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
                   <input placeholder="Эзэмшигчийн нэр" value={form.owner_name || ''} onChange={(e) => set('owner_name', e.target.value)}
@@ -172,24 +176,29 @@ function ClientsPage() {
       </Dialog>
 
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="min-w-[600px]">
+        <div className="min-w-[900px]">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/50 text-left">
+                <th className="px-4 py-3 font-medium">Код</th>
                 <th className="px-4 py-3 font-medium">Нэр</th>
                 <th className="px-4 py-3 font-medium">Утас</th>
                 <th className="px-4 py-3 font-medium">Эзэмшигч</th>
                 <th className="px-4 py-3 font-medium">Дүүрэг</th>
                 <th className="px-4 py-3 font-medium">Төлөв</th>
+                <th className="px-4 py-3 font-medium">Гадна зураг</th>
+                <th className="px-4 py-3 font-medium">Дотор зураг</th>
+                <th className="px-4 py-3 font-medium">Огноо</th>
                 <th className="px-4 py-3 font-medium">Үйлдэл</th>
               </tr>
             </thead>
             <tbody>
               {clients.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Одоогоор харилцагч байхгүй</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">Одоогоор харилцагч байхгүй</td></tr>
               )}
               {clients.map((c) => (
                 <tr key={c.id} className="border-t">
+                  <td className="px-4 py-3 font-mono text-xs">{c.client_code || '-'}</td>
                   <td className="px-4 py-3 font-medium">{c.name}</td>
                   <td className="px-4 py-3">{c.phone || '-'}</td>
                   <td className="px-4 py-3">{c.owner_name || '-'}</td>
@@ -200,6 +209,23 @@ function ClientsPage() {
                     ) : c.status === 'inactive' ? (
                       <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">Идэвхгүй</span>
                     ) : '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {c.outdoor_photo ? (
+                      <img src={getFileUrl(c.outdoor_photo) || ''} alt="Гадна"
+                        className="h-10 w-10 cursor-pointer rounded border object-cover hover:opacity-80"
+                        onClick={() => setPreviewUrl(getFileUrl(c.outdoor_photo))} />
+                    ) : '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {c.indoor_photo ? (
+                      <img src={getFileUrl(c.indoor_photo) || ''} alt="Дотор"
+                        className="h-10 w-10 cursor-pointer rounded border object-cover hover:opacity-80"
+                        onClick={() => setPreviewUrl(getFileUrl(c.indoor_photo))} />
+                    ) : '-'}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString('mn-MN') : '-'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
@@ -214,6 +240,18 @@ function ClientsPage() {
           </table>
         </div>
       </div>
+
+      {previewUrl && (
+        <Dialog open={true} onOpenChange={(v) => { if (!v) setPreviewUrl(null) }}>
+          <DialogPortal>
+            <DialogBackdrop />
+            <DialogPopup className="max-h-[90vh] max-w-[90vw] overflow-auto p-2 sm:max-w-3xl">
+              <img src={previewUrl} alt="Зураг" className="h-auto w-full rounded" />
+              <DialogClose render={<Button variant="outline" size="sm" className="mt-2 w-full">Хаах</Button>} />
+            </DialogPopup>
+          </DialogPortal>
+        </Dialog>
+      )}
     </div>
   )
 }

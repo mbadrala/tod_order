@@ -50,6 +50,7 @@ function initializeDatabase(PDO $pdo): void
         CREATE TABLE IF NOT EXISTS clients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
+            client_code TEXT,
             name TEXT NOT NULL,
             phone TEXT,
             owner_name TEXT,
@@ -65,6 +66,20 @@ function initializeDatabase(PDO $pdo): void
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ");
+
+    // migration: add client_code column for existing databases
+    try {
+        $pdo->exec("ALTER TABLE clients ADD COLUMN client_code TEXT");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
+    // unique index on client_code
+    try {
+        $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_client_code ON clients(client_code)");
+    } catch (\Exception $e) {
+        // index already exists
+    }
 }
 
 function seedAdmin(PDO $pdo): void

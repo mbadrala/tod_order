@@ -22,12 +22,15 @@ class AuthMiddleware implements MiddlewareInterface
     public function process(Request $request, RequestHandler $handler): Response
     {
         $header = $request->getHeaderLine('Authorization');
+        $queryToken = $request->getQueryParams()['token'] ?? null;
 
-        if (!$header || !str_starts_with($header, 'Bearer ')) {
+        if ($header && str_starts_with($header, 'Bearer ')) {
+            $token = substr($header, 7);
+        } elseif ($queryToken) {
+            $token = $queryToken;
+        } else {
             return $this->unauthorized('Missing or malformed token');
         }
-
-        $token = substr($header, 7);
 
         try {
             $decoded = JWT::decode($token, new Key($this->secret, 'HS256'));
