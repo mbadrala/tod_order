@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate, useLocation, Link, Outlet } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,6 +18,7 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -24,9 +26,17 @@ function DashboardLayout() {
     navigate("/login");
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="flex h-svh">
-      <aside className="flex w-60 flex-col border-r bg-muted/30">
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 sm:hidden" onClick={closeSidebar} />
+      )}
+
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r bg-background transition-transform duration-200 sm:static sm:z-auto sm:translate-x-0 ${
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+      }`}>
         <div className="flex items-center gap-3 px-5 pt-5 pb-3">
           <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
           <span className="text-sm font-semibold">ТОД ОЙМС ХХК</span>
@@ -39,6 +49,7 @@ function DashboardLayout() {
             <Link
               key={item.path}
               to={item.path}
+              onClick={closeSidebar}
               className={`flex rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 location.pathname === item.path
                   ? 'bg-primary text-primary-foreground'
@@ -72,8 +83,17 @@ function DashboardLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto p-6">
-        <Outlet />
+      <main className="flex min-w-0 flex-1 flex-col overflow-auto">
+        <header className="flex items-center gap-3 border-b px-4 py-3 sm:hidden">
+          <button onClick={() => setSidebarOpen(true)} className="-ml-1 rounded-lg p-1 hover:bg-muted">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <img src="/logo.png" alt="Logo" className="h-7 w-auto" />
+        </header>
+
+        <div className="flex-1 overflow-auto p-4 sm:p-6">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
