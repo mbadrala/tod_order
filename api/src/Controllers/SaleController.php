@@ -14,6 +14,215 @@ class SaleController
         $this->pdo = $pdo;
     }
 
+    public function report(Request $request, Response $response): Response
+    {
+        $params = $request->getQueryParams();
+        $from = $params['from'] ?? '';
+        $to = $params['to'] ?? '';
+        $clientCode = $params['client_code'] ?? '';
+
+        $sql = "SELECT s.*, u.name AS user_name FROM sales s LEFT JOIN users u ON s.user_id = u.id WHERE s.status = 'final'";
+        $binds = [];
+
+        if ($from !== '') {
+            $sql .= " AND s.sale_date >= ?";
+            $binds[] = $from;
+        }
+        if ($to !== '') {
+            $sql .= " AND s.sale_date <= ?";
+            $binds[] = $to;
+        }
+        if ($clientCode !== '') {
+            $sql .= " AND s.client_code = ?";
+            $binds[] = $clientCode;
+        }
+
+        $sql .= " ORDER BY s.sale_date DESC, s.id DESC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($binds);
+        $sales = $stmt->fetchAll();
+
+        if (!empty($sales)) {
+            $ids = array_column($sales, 'id');
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+            $stmt = $this->pdo->prepare("SELECT * FROM sale_items WHERE sale_id IN ($placeholders) ORDER BY id");
+            $stmt->execute($ids);
+            $allItems = $stmt->fetchAll();
+            $itemsBySale = [];
+            foreach ($allItems as $item) {
+                $itemsBySale[$item['sale_id']][] = $item;
+            }
+
+            $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id IN ($placeholders) ORDER BY id");
+            $stmt->execute($ids);
+            $allAllocs = $stmt->fetchAll();
+            $allocsBySale = [];
+            foreach ($allAllocs as $a) {
+                $allocsBySale[$a['sale_id']][] = $a;
+            }
+
+            foreach ($sales as &$sale) {
+                $sale['items'] = $itemsBySale[$sale['id']] ?? [];
+                $sale['bank_allocations'] = $allocsBySale[$sale['id']] ?? [];
+            }
+            unset($sale);
+        }
+
+        return $this->json($response, $sales);
+    }
+
+    public function reportPdf(Request $request, Response $response): Response
+    {
+        $params = $request->getQueryParams();
+        $from = $params['from'] ?? '';
+        $to = $params['to'] ?? '';
+        $clientCode = $params['client_code'] ?? '';
+
+        $sql = "SELECT s.*, u.name AS user_name FROM sales s LEFT JOIN users u ON s.user_id = u.id WHERE s.status = 'final'";
+        $binds = [];
+
+        if ($from !== '') {
+            $sql .= " AND s.sale_date >= ?";
+            $binds[] = $from;
+        }
+        if ($to !== '') {
+            $sql .= " AND s.sale_date <= ?";
+            $binds[] = $to;
+        }
+        if ($clientCode !== '') {
+            $sql .= " AND s.client_code = ?";
+            $binds[] = $clientCode;
+        }
+
+        $sql .= " ORDER BY s.sale_date DESC, s.id DESC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($binds);
+        $sales = $stmt->fetchAll();
+
+        $bankAccounts = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY bank_name")->fetchAll();
+
+        if (!empty($sales)) {
+            $ids = array_column($sales, 'id');
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+            $stmt = $this->pdo->prepare("SELECT * FROM sale_items WHERE sale_id IN ($placeholders) ORDER BY id");
+            $stmt->execute($ids);
+            $allItems = $stmt->fetchAll();
+            $itemsBySale = [];
+            foreach ($allItems as $item) {
+                $itemsBySale[$item['sale_id']][] = $item;
+            }
+
+            $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id IN ($placeholders) ORDER BY id");
+            $stmt->execute($ids);
+            $allAllocs = $stmt->fetchAll();
+            $allocsBySale = [];
+            foreach ($allAllocs as $a) {
+                $allocsBySale[$a['sale_id']][] = $a;
+            }
+
+            foreach ($sales as &$sale) {
+                $sale['items'] = $itemsBySale[$sale['id']] ?? [];
+                $sale['bank_allocations'] = $allocsBySale[$sale['id']] ?? [];
+            }
+            unset($sale);
+        }
+
+        $bdr = '#d1d5db';
+        $bg = '#f3f4f6';
+
+        $bankCols = '';
+        foreach ($bankAccounts as $i => $ba) {
+            $num = $i + 1;
+            $bankCols .= '<th style="padding:3px 4px;border:1px solid ' . $bdr . ';text-align:right;font-weight:bold;white-space:nowrap;font-size:8px;">Данс ' . $num . '</th>';
+        }
+
+        $bodyRows = '';
+        foreach ($sales as $sale) {
+            $allocsByAccountId = [];
+            foreach (($sale['bank_allocations'] ?? []) as $a) {
+                $allocsByAccountId[$a['bank_account_id']] = $a['amount'];
+            }
+            foreach (($sale['items'] ?? []) as $item) {
+                $bankCells = '';
+                foreach ($bankAccounts as $ba) {
+                    $amt = $allocsByAccountId[$ba['id']] ?? 0;
+                    $bankCells .= '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($amt) . '</td>';
+                }
+                $bodyRows .= '<tr>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['sale_date']) . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['client_code'] ?? '') . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['client_name'] ?? '') . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['client_phone'] ?? '') . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['slip_number'] ?? '') . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($item['product_code']) . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($item['product_name']) . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . $item['amount'] . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($item['unit_price']) . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($item['sum_price']) . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">0</td>'
+                    . $bankCells
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">0</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['user_name'] ?? '') . '</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['created_at']) . '</td>'
+                    . '</tr>';
+            }
+        }
+
+        $html = '<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<style>
+    body { font-family: "DejaVu Sans", sans-serif; font-size: 8px; margin: 10px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 2px 4px; border: 1px solid ' . $bdr . '; white-space: nowrap; }
+    th { background: ' . $bg . '; font-weight: bold; text-align: left; }
+    .right { text-align: right; }
+</style>
+</head>
+<body>
+<table>
+<thead>
+<tr>
+    <th>Огноо</th>
+    <th>Харилцагчийн код</th>
+    <th>Харилцагчийн нэр</th>
+    <th>Утасны дугаар</th>
+    <th>Падааны дугаар</th>
+    <th>Барааны код</th>
+    <th>Барааны нэр</th>
+    <th class="right">Тоо хэмжээ</th>
+    <th class="right">Нэгж үнэ</th>
+    <th class="right">Дүн</th>
+    <th class="right">Бэлэн</th>
+    ' . $bankCols . '
+    <th class="right">Дараа төлбөр</th>
+    <th>Бүртгэсэн ажилтан</th>
+    <th>Бүртгэсэн огноо</th>
+</tr>
+</thead>
+<tbody>
+' . $bodyRows . '
+</tbody>
+</table>
+</body>
+</html>';
+
+        $dompdf = new \Dompdf\Dompdf();
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        $response->getBody()->write($dompdf->output());
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            ->withHeader('Content-Disposition', 'attachment; filename="report.pdf"');
+    }
+
     public function list(Request $request, Response $response): Response
     {
         $stmt = $this->pdo->query("SELECT * FROM sales ORDER BY sale_date DESC, id DESC");

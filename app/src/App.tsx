@@ -8,6 +8,7 @@ import ClientsPage from './pages/ClientsPage'
 import ProductsPage from './pages/ProductsPage'
 import SalesPage from './pages/SalesPage'
 import BankAccountsPage from './pages/BankAccountsPage'
+import ReportsPage from './pages/ReportsPage'
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
             </AdminRoute>
           }
         />
+        <Route path="/reports" element={<ReportsPage />} />
       </Route>
     </Routes>
   )

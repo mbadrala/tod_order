@@ -90,6 +90,8 @@ $saleController = new SaleController($pdo);
 $app->group('/sales', function (RouteCollectorProxy $group) use ($saleController) {
     $group->get('', [$saleController, 'list']);
     $group->post('', [$saleController, 'create']);
+    $group->get('/report', [$saleController, 'report']);
+    $group->get('/report/pdf', [$saleController, 'reportPdf']);
     $group->get('/{id}', [$saleController, 'get']);
     $group->put('/{id}', [$saleController, 'update']);
     $group->delete('/{id}', [$saleController, 'delete']);

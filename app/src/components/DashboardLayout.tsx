@@ -14,6 +14,7 @@ function navItems(isAdmin: boolean) {
     items.push({ label: "Банкны данс", path: "/bank-accounts" })
     items.push({ label: "Хэрэглэгчид", path: "/users" })
   }
+  items.push({ label: "Тайлан", path: "/reports" })
   return items
 }
 
