@@ -27,6 +27,8 @@ interface FlatRow {
   amount: number
   unit_price: number
   sum_price: number
+  cash_amount: number
+  deferred_amount: number
   user_name: string
   created_at: string
   bankAllocs: Record<string, number>
@@ -112,6 +114,8 @@ function ReportsPage() {
           amount: item.amount,
           unit_price: item.unit_price,
           sum_price: item.sum_price,
+          cash_amount: sale.cash_amount ?? 0,
+          deferred_amount: sale.deferred_amount ?? 0,
           user_name: (sale as any).user_name || '',
           created_at: sale.created_at,
           bankAllocs: { ...bankByAccountId },
@@ -141,15 +145,15 @@ function ReportsPage() {
       'Огноо', 'Харилцагчийн код', 'Харилцагчийн нэр', 'Утасны дугаар',
       'Падааны дугаар', 'Барааны код', 'Барааны нэр', 'Тоо хэмжээ',
       'Нэгж үнэ', 'Дүн', 'Бэлэн',
-      ...bankAccounts.map((_, i) => `Данс ${i + 1}`),
+      ...bankAccounts.map((ba) => (ba.account_name || ba.bank_name || `Данс ${i + 1}`)),
       'Дараа төлбөр', 'Бүртгэсэн ажилтан', 'Бүртгэсэн огноо',
     ]
     const body = flatRows.map((r) => [
       r.sale_date, r.client_code, r.client_name, r.client_phone,
       r.slip_number, r.product_code, r.product_name, r.amount,
-      r.unit_price, r.sum_price, 0,
+      r.unit_price, r.sum_price, r.cash_amount,
       ...bankAccounts.map((ba) => r.bankAllocs[String(ba.id)] || 0),
-      0, r.user_name, r.created_at,
+      r.deferred_amount, r.user_name, r.created_at,
     ])
     const ws = XLSX.utils.aoa_to_sheet([headers, ...body])
     const wb = XLSX.utils.book_new()
@@ -222,9 +226,9 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Нэгж үнэ</th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Дүн</th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Бэлэн</th>
-                {bankAccounts.map((ba, i) => (
+                {bankAccounts.map((ba) => (
                   <th key={ba.id} className="whitespace-nowrap px-2 py-2 font-medium text-right" title={`${ba.bank_name} - ${ba.account_number}`}>
-                    Данс {i + 1}
+                    {ba.account_name || ba.bank_name}
                   </th>
                 ))}
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Дараа төлбөр</th>
@@ -245,13 +249,13 @@ function ReportsPage() {
                   <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.amount}</td>
                   <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.unit_price.toLocaleString('mn-MN')}</td>
                   <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums font-medium">{r.sum_price.toLocaleString('mn-MN')}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">0</td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.cash_amount.toLocaleString('mn-MN')}</td>
                   {bankAccounts.map((ba) => (
                     <td key={ba.id} className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">
                       {(r.bankAllocs[String(ba.id)] || 0).toLocaleString('mn-MN')}
                     </td>
                   ))}
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">0</td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.deferred_amount.toLocaleString('mn-MN')}</td>
                   <td className="whitespace-nowrap px-2 py-1.5">{r.user_name}</td>
                   <td className="whitespace-nowrap px-2 py-1.5">{r.created_at}</td>
                 </tr>

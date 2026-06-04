@@ -102,7 +102,7 @@ class SaleController
         $stmt->execute($binds);
         $sales = $stmt->fetchAll();
 
-        $bankAccounts = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY bank_name")->fetchAll();
+        $bankAccounts = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY id")->fetchAll();
 
         if (!empty($sales)) {
             $ids = array_column($sales, 'id');
@@ -135,9 +135,9 @@ class SaleController
         $bg = '#f3f4f6';
 
         $bankCols = '';
-        foreach ($bankAccounts as $i => $ba) {
-            $num = $i + 1;
-            $bankCols .= '<th style="padding:3px 4px;border:1px solid ' . $bdr . ';text-align:right;font-weight:bold;white-space:nowrap;font-size:8px;">Данс ' . $num . '</th>';
+        foreach ($bankAccounts as $ba) {
+            $label = !empty($ba['account_name']) ? $ba['account_name'] : ($ba['bank_name'] ?? '');
+            $bankCols .= '<th style="padding:3px 4px;border:1px solid ' . $bdr . ';text-align:right;font-weight:bold;white-space:nowrap;font-size:8px;">' . htmlspecialchars($label) . '</th>';
         }
 
         $bodyRows = '';
@@ -163,9 +163,9 @@ class SaleController
                     . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . $item['amount'] . '</td>'
                     . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($item['unit_price']) . '</td>'
                     . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($item['sum_price']) . '</td>'
-                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">0</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($sale['cash_amount'] ?? 0) . '</td>'
                     . $bankCells
-                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">0</td>'
+                    . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($sale['deferred_amount'] ?? 0) . '</td>'
                     . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['user_name'] ?? '') . '</td>'
                     . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['created_at']) . '</td>'
                     . '</tr>';
@@ -292,6 +292,8 @@ class SaleController
         $status = $body['status'] ?? 'final';
         $items = $body['items'] ?? [];
         $bankAllocations = $body['bank_allocations'] ?? [];
+        $cashAmount = (float)($body['cash_amount'] ?? 0);
+        $deferredAmount = (float)($body['deferred_amount'] ?? 0);
 
         if ($slipNumber === '') {
             return $this->json($response, ['error' => 'slip number is required'], 400);
@@ -310,7 +312,7 @@ class SaleController
         }
         unset($item);
 
-        $allocTotal = 0;
+        $allocTotal = $cashAmount + $deferredAmount;
         if (is_array($bankAllocations)) {
             foreach ($bankAllocations as &$a) {
                 $aAmount = (float)($a['amount'] ?? 0);
@@ -321,16 +323,16 @@ class SaleController
         }
 
         if ($status === 'final' && $allocTotal < $totalAmount) {
-            return $this->json($response, ['error' => 'Банкны хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+            return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
         }
 
         $this->pdo->beginTransaction();
         try {
             $stmt = $this->pdo->prepare("
-                INSERT INTO sales (sale_date, client_code, client_name, client_phone, slip_number, status, total_amount, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO sales (sale_date, client_code, client_name, client_phone, slip_number, status, total_amount, cash_amount, deferred_amount, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$saleDate, $clientCode, $clientName, $clientPhone, $slipNumber, $status, $totalAmount, $userId]);
+            $stmt->execute([$saleDate, $clientCode, $clientName, $clientPhone, $slipNumber, $status, $totalAmount, $cashAmount, $deferredAmount, $userId]);
             $saleId = $this->pdo->lastInsertId();
 
             $stmt = $this->pdo->prepare("
@@ -350,8 +352,8 @@ class SaleController
 
             if (is_array($bankAllocations) && !empty($bankAllocations)) {
                 $stmt = $this->pdo->prepare("
-                    INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, amount)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, account_name, amount)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ");
                 foreach ($bankAllocations as $a) {
                     $stmt->execute([
@@ -359,6 +361,7 @@ class SaleController
                         $a['bank_account_id'],
                         $a['bank_name'] ?? '',
                         $a['account_number'] ?? '',
+                        $a['account_name'] ?? '',
                         $a['amount'],
                     ]);
                 }
@@ -402,7 +405,7 @@ class SaleController
             return $this->json($response, ['error' => 'Та зөвхөн өөрийн үүсгэсэн борлуулалтыг засах боломжтой'], 403);
         }
 
-        $fields = ['sale_date', 'client_code', 'client_name', 'client_phone', 'slip_number', 'status'];
+        $fields = ['sale_date', 'client_code', 'client_name', 'client_phone', 'slip_number', 'status', 'cash_amount', 'deferred_amount'];
         $set = [];
         $params = [];
 
@@ -431,8 +434,10 @@ class SaleController
             unset($item);
 
             $status = $body['status'] ?? $sale['status'] ?? 'final';
+            $cashAmount = (float)($body['cash_amount'] ?? $sale['cash_amount'] ?? 0);
+            $deferredAmount = (float)($body['deferred_amount'] ?? $sale['deferred_amount'] ?? 0);
 
-            $allocTotal = 0;
+            $allocTotal = $cashAmount + $deferredAmount;
             if (is_array($bankAllocations)) {
                 foreach ($bankAllocations as &$a) {
                     $aAmount = (float)($a['amount'] ?? 0);
@@ -443,7 +448,7 @@ class SaleController
             }
 
             if ($status === 'final' && $allocTotal < $totalAmount) {
-                return $this->json($response, ['error' => 'Банкны хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+                return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
             }
 
             $set[] = "total_amount = ?";
@@ -472,8 +477,8 @@ class SaleController
 
                 if (is_array($bankAllocations) && !empty($bankAllocations)) {
                     $stmtAlloc = $this->pdo->prepare("
-                        INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, amount)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, account_name, amount)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     ");
                     foreach ($bankAllocations as $a) {
                         $stmtAlloc->execute([
@@ -493,7 +498,9 @@ class SaleController
             $status = $body['status'] ?? $sale['status'] ?? 'final';
 
             if ($bankAllocations !== null && $status === 'final') {
-                $allocTotal = 0;
+                $cashAmount = (float)($body['cash_amount'] ?? $sale['cash_amount'] ?? 0);
+                $deferredAmount = (float)($body['deferred_amount'] ?? $sale['deferred_amount'] ?? 0);
+                $allocTotal = $cashAmount + $deferredAmount;
                 if (is_array($bankAllocations)) {
                     foreach ($bankAllocations as &$a) {
                         $aAmount = (float)($a['amount'] ?? 0);
@@ -509,15 +516,15 @@ class SaleController
                 $existingTotal = (float)($existing['total_amount'] ?? 0);
 
                 if ($allocTotal < $existingTotal) {
-                    return $this->json($response, ['error' => 'Банкны хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+                    return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
                 }
 
                 $this->pdo->prepare("DELETE FROM sale_bank_allocations WHERE sale_id = ?")->execute([$args['id']]);
 
                 if (is_array($bankAllocations) && !empty($bankAllocations)) {
                     $stmtAlloc = $this->pdo->prepare("
-                        INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, amount)
-                        VALUES (?, ?, ?, ?, ?)
+                        INSERT INTO sale_bank_allocations (sale_id, bank_account_id, bank_name, account_number, account_name, amount)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     ");
                     foreach ($bankAllocations as $a) {
                         $stmtAlloc->execute([

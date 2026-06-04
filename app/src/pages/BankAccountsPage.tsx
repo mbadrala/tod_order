@@ -19,7 +19,7 @@ function BankAccountsPage() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'bank_name', desc: false }])
   const [open, setOpen] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
-  const [form, setForm] = useState<BankAccountInput>({ bank_name: '', account_number: '' })
+  const [form, setForm] = useState<BankAccountInput>({ bank_name: '', account_number: '', account_name: '' })
   const [error, setError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -32,13 +32,13 @@ function BankAccountsPage() {
   useEffect(() => { load() }, [])
 
   const resetForm = () => {
-    setForm({ bank_name: '', account_number: '' })
+    setForm({ bank_name: '', account_number: '', account_name: '' })
     setEditId(null)
     setError('')
   }
 
   const openEdit = (a: BankAccount) => {
-    setForm({ bank_name: a.bank_name, account_number: a.account_number })
+    setForm({ bank_name: a.bank_name, account_number: a.account_number, account_name: a.account_name })
     setEditId(a.id)
     setError('')
     setOpen(true)
@@ -54,15 +54,15 @@ function BankAccountsPage() {
 
   const handleSubmit = async () => {
     setError('')
-    if (!form.bank_name.trim() || !form.account_number.trim()) {
-      setError('Банкны нэр болон дансны дугаар шаардлагатай')
+    if (!form.bank_name.trim() || !form.account_number.trim() || !form.account_name.trim()) {
+      setError('Банкны нэр, дансны нэр болон дансны дугаар шаардлагатай')
       return
     }
     try {
       if (editId) {
-        await updateBankAccount(editId, { bank_name: form.bank_name.trim(), account_number: form.account_number.trim() })
+        await updateBankAccount(editId, { bank_name: form.bank_name.trim(), account_number: form.account_number.trim(), account_name: form.account_name.trim() })
       } else {
-        await createBankAccount({ bank_name: form.bank_name.trim(), account_number: form.account_number.trim() })
+        await createBankAccount({ bank_name: form.bank_name.trim(), account_number: form.account_number.trim(), account_name: form.account_name.trim() })
       }
       resetForm()
       setOpen(false)
@@ -89,6 +89,18 @@ function BankAccountsPage() {
   }
 
   const columns: ColumnDef<BankAccount>[] = [
+    {
+      accessorKey: 'id',
+      header: 'Д/д',
+    },
+    {
+      accessorKey: 'account_name',
+      header: 'Дансны нэр',
+      cell: ({ getValue }) => {
+        const v = getValue() as string | null
+        return v || '-'
+      },
+    },
     {
       accessorKey: 'bank_name',
       header: 'Банкны нэр',
@@ -150,6 +162,8 @@ function BankAccountsPage() {
           <DialogPopup>
             <DialogTitle>{editId ? 'Данс засах' : 'Шинэ данс'}</DialogTitle>
             <div className="mt-4 space-y-3">
+              <input placeholder="Дансны нэр *" value={form.account_name} onChange={(e) => setField('account_name', e.target.value)}
+                className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
               <input placeholder="Банкны нэр *" value={form.bank_name} onChange={(e) => setField('bank_name', e.target.value)}
                 className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
               <input placeholder="Дансны дугаар *" value={form.account_number} onChange={(e) => setField('account_number', e.target.value)}

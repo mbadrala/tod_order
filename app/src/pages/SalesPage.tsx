@@ -27,6 +27,7 @@ interface BankAllocForm {
   bank_account_id: number
   bank_name: string
   account_number: string
+  account_name: string
   amount: number
 }
 
@@ -46,6 +47,8 @@ function SalesPage() {
   const [clientPhone, setClientPhone] = useState('')
   const [slipNumber, setSlipNumber] = useState('')
   const [items, setItems] = useState<LineItemForm[]>([emptyLine()])
+  const [cashAmount, setCashAmount] = useState(0)
+  const [deferredAmount, setDeferredAmount] = useState(0)
   const [allocations, setAllocations] = useState<BankAllocForm[]>([])
   const [error, setError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
@@ -70,6 +73,8 @@ function SalesPage() {
     setClientPhone('')
     setSlipNumber('')
     setItems([emptyLine()])
+    setCashAmount(0)
+    setDeferredAmount(0)
     setAllocations([])
     setEditId(null)
     setError('')
@@ -81,6 +86,8 @@ function SalesPage() {
     setClientName(s.client_name || '')
     setClientPhone(s.client_phone || '')
     setSlipNumber(s.slip_number || '')
+    setCashAmount(s.cash_amount)
+    setDeferredAmount(s.deferred_amount)
     setItems(s.items.map((i) => ({
       product_code: i.product_code,
       product_name: i.product_name,
@@ -91,6 +98,7 @@ function SalesPage() {
       bank_account_id: a.bank_account_id,
       bank_name: a.bank_name,
       account_number: a.account_number,
+      account_name: a.account_name,
       amount: a.amount,
     })))
     setEditId(s.id)
@@ -137,8 +145,8 @@ function SalesPage() {
   )
 
   const allocTotal = useMemo(() =>
-    allocations.reduce((sum, a) => sum + (a.amount || 0), 0),
-    [allocations]
+    (cashAmount || 0) + (deferredAmount || 0) + allocations.reduce((sum, a) => sum + (a.amount || 0), 0),
+    [cashAmount, deferredAmount, allocations]
   )
 
   const dateStr = useMemo(() => {
@@ -156,7 +164,7 @@ function SalesPage() {
       return
     }
     if (status === 'final' && allocTotal < totalSum) {
-      setError('Банкны хуваарилалтын дүн нийт дүнгээс бага байна')
+      setError('Хуваарилалтын дүн нийт дүнгээс бага байна')
       return
     }
     try {
@@ -167,6 +175,8 @@ function SalesPage() {
         client_phone: clientPhone || null,
         slip_number: slipNumber.trim(),
         status,
+        cash_amount: cashAmount || 0,
+        deferred_amount: deferredAmount || 0,
         items: items.map((i) => ({
           product_code: i.product_code,
           product_name: i.product_name,
@@ -177,6 +187,7 @@ function SalesPage() {
           bank_account_id: a.bank_account_id,
           bank_name: a.bank_name,
           account_number: a.account_number,
+          account_name: a.account_name,
           amount: a.amount,
         })),
       }
@@ -401,16 +412,42 @@ function SalesPage() {
             <Separator className="my-4" />
 
             <div>
-              <p className="mb-2 text-sm font-medium">Банкны хуваарилалт</p>
-              <p className="mb-3 text-xs text-muted-foreground">Нийт дүнг банкны дансууд руу хуваарилах</p>
+              <p className="mb-2 text-sm font-medium">Төлбөрийн хэлбэр</p>
+              <p className="mb-3 text-xs text-muted-foreground">Нийт дүнг төлбөрийн хэлбэрүүдээр хуваарилах</p>
               <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Бэлэн</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input type="number" min="0" step="100"
+                      value={cashAmount}
+                      onChange={(e) => setCashAmount(Number(e.target.value))}
+                      className="w-28 rounded border px-2 py-1.5 text-right text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 tabular-nums"
+                    />
+                    <span className="text-xs text-muted-foreground">₮</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Дараа төлбөр</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input type="number" min="0" step="100"
+                      value={deferredAmount}
+                      onChange={(e) => setDeferredAmount(Number(e.target.value))}
+                      className="w-28 rounded border px-2 py-1.5 text-right text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 tabular-nums"
+                    />
+                    <span className="text-xs text-muted-foreground">₮</span>
+                  </div>
+                </div>
                 {bankAccounts.map((ba) => {
                   const alloc = allocations.find((a) => a.bank_account_id === ba.id)
                   return (
                     <div key={ba.id} className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{ba.bank_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{ba.account_number}</p>
+                        <p className="text-sm font-medium truncate">{(ba.account_name || ba.bank_name)}</p>
+                        <p className="text-xs text-muted-foreground truncate">{ba.bank_name} , {ba.account_number}</p>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <input type="number" min="0" step="100"
@@ -424,6 +461,7 @@ function SalesPage() {
                                 bank_account_id: ba.id,
                                 bank_name: ba.bank_name,
                                 account_number: ba.account_number,
+                                account_name: ba.account_name,
                                 amount: val,
                               }])
                             }
@@ -436,16 +474,14 @@ function SalesPage() {
                   )
                 })}
               </div>
-              {bankAccounts.length > 0 && (
-                <div className="mt-3 flex justify-end border-t pt-3">
-                  <div className={`text-sm font-semibold tabular-nums ${allocTotal < totalSum ? 'text-destructive' : ''}`}>
-                    Хуваарилалт: {allocTotal.toLocaleString('mn-MN')} ₮
-                    {allocTotal < totalSum && (
-                      <span className="ml-2 text-xs font-normal">({(totalSum - allocTotal).toLocaleString('mn-MN')} ₮ дутуу)</span>
-                    )}
-                  </div>
+              <div className="mt-3 flex justify-end border-t pt-3">
+                <div className={`text-sm font-semibold tabular-nums ${allocTotal < totalSum ? 'text-destructive' : ''}`}>
+                  Хуваарилалт: {allocTotal.toLocaleString('mn-MN')} ₮
+                  {allocTotal < totalSum && (
+                    <span className="ml-2 text-xs font-normal">({(totalSum - allocTotal).toLocaleString('mn-MN')} ₮ дутуу)</span>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             {error && <p className="mt-3 text-sm text-destructive">{error}</p>}

@@ -130,6 +130,7 @@ export interface SaleBankAllocation {
   bank_account_id: number
   bank_name: string
   account_number: string
+  account_name: string
   amount: number
 }
 
@@ -142,6 +143,8 @@ export interface Sale {
   slip_number: string | null
   status: string
   total_amount: number
+  cash_amount: number
+  deferred_amount: number
   user_id: number
   created_at: string
   updated_at: string
@@ -166,6 +169,8 @@ export interface SaleInput {
   client_phone?: string | null
   slip_number?: string | null
   status?: string
+  cash_amount?: number
+  deferred_amount?: number
   items: Array<{
     product_code: string
     product_name: string
@@ -204,11 +209,12 @@ export interface BankAccount {
   id: number
   bank_name: string
   account_number: string
+  account_name: string
   created_at: string
   updated_at: string
 }
 
-export type BankAccountInput = { bank_name: string; account_number: string }
+export type BankAccountInput = { bank_name: string; account_number: string; account_name: string }
 
 export async function getBankAccounts() {
   return request<BankAccount[]>('/bank-accounts')

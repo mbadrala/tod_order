@@ -105,6 +105,32 @@ function initializeDatabase(PDO $pdo): void
         // column already exists
     }
 
+    // migration: add account_name to bank_accounts
+    try {
+        $pdo->exec("ALTER TABLE bank_accounts ADD COLUMN account_name TEXT NOT NULL DEFAULT ''");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
+    // migration: add account_name to sale_bank_allocations
+    try {
+        $pdo->exec("ALTER TABLE sale_bank_allocations ADD COLUMN account_name TEXT NOT NULL DEFAULT ''");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
+    // migration: add cash_amount and deferred_amount columns
+    try {
+        $pdo->exec("ALTER TABLE sales ADD COLUMN cash_amount REAL NOT NULL DEFAULT 0");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+    try {
+        $pdo->exec("ALTER TABLE sales ADD COLUMN deferred_amount REAL NOT NULL DEFAULT 0");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS sale_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,6 +149,7 @@ function initializeDatabase(PDO $pdo): void
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             bank_name TEXT NOT NULL,
             account_number TEXT NOT NULL,
+            account_name TEXT NOT NULL DEFAULT '',
             created_at DATETIME DEFAULT (datetime('now')),
             updated_at DATETIME DEFAULT (datetime('now'))
         )
@@ -135,6 +162,7 @@ function initializeDatabase(PDO $pdo): void
             bank_account_id INTEGER NOT NULL,
             bank_name TEXT NOT NULL,
             account_number TEXT NOT NULL,
+            account_name TEXT NOT NULL DEFAULT '',
             amount REAL NOT NULL DEFAULT 0,
             FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
         )

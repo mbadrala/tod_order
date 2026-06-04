@@ -16,7 +16,7 @@ class BankAccountController
 
     public function list(Request $request, Response $response): Response
     {
-        $stmt = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY bank_name");
+        $stmt = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY id");
         return $this->json($response, $stmt->fetchAll());
     }
 
@@ -42,13 +42,14 @@ class BankAccountController
         $body = $request->getParsedBody();
         $bankName = trim($body['bank_name'] ?? '');
         $accountNumber = trim($body['account_number'] ?? '');
+        $accountName = trim($body['account_name'] ?? '');
 
-        if ($bankName === '' || $accountNumber === '') {
-            return $this->json($response, ['error' => 'bank name and account number are required'], 400);
+        if ($bankName === '' || $accountNumber === '' || $accountName === '') {
+            return $this->json($response, ['error' => 'bank name, account name and account number are required'], 400);
         }
 
-        $stmt = $this->pdo->prepare("INSERT INTO bank_accounts (bank_name, account_number) VALUES (?, ?)");
-        $stmt->execute([$bankName, $accountNumber]);
+        $stmt = $this->pdo->prepare("INSERT INTO bank_accounts (bank_name, account_number, account_name) VALUES (?, ?, ?)");
+        $stmt->execute([$bankName, $accountNumber, $accountName]);
 
         $id = $this->pdo->lastInsertId();
         $stmt = $this->pdo->prepare("SELECT * FROM bank_accounts WHERE id = ?");
@@ -70,7 +71,7 @@ class BankAccountController
         }
 
         $body = $request->getParsedBody();
-        $fields = ['bank_name', 'account_number'];
+        $fields = ['bank_name', 'account_number', 'account_name'];
         $set = [];
         $params = [];
 
