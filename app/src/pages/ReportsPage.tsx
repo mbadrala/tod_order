@@ -145,7 +145,7 @@ function ReportsPage() {
       'Огноо', 'Харилцагчийн код', 'Харилцагчийн нэр', 'Утасны дугаар',
       'Падааны дугаар', 'Барааны код', 'Барааны нэр', 'Тоо хэмжээ',
       'Нэгж үнэ', 'Дүн', 'Бэлэн',
-      ...bankAccounts.map((ba) => (ba.account_name || ba.bank_name || `Данс ${i + 1}`)),
+      ...bankAccounts.map((ba, i) => (ba.account_name || ba.bank_name || `Данс ${i + 1}`)),
       'Дараа төлбөр', 'Бүртгэсэн ажилтан', 'Бүртгэсэн огноо',
     ]
     const body = flatRows.map((r) => [
