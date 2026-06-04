@@ -80,6 +80,53 @@ function initializeDatabase(PDO $pdo): void
     } catch (\Exception $e) {
         // index already exists
     }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_date TEXT NOT NULL,
+            client_code TEXT,
+            client_name TEXT,
+            client_phone TEXT,
+            slip_number TEXT,
+            status TEXT NOT NULL DEFAULT 'final',
+            total_amount REAL NOT NULL DEFAULT 0,
+            user_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT (datetime('now')),
+            updated_at DATETIME DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ");
+
+    // migration: add status column for existing databases
+    try {
+        $pdo->exec("ALTER TABLE sales ADD COLUMN status TEXT NOT NULL DEFAULT 'final'");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sale_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            product_code TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 1,
+            unit_price REAL NOT NULL DEFAULT 0,
+            sum_price REAL NOT NULL DEFAULT 0,
+            FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+        )
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS bank_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bank_name TEXT NOT NULL,
+            account_number TEXT NOT NULL,
+            created_at DATETIME DEFAULT (datetime('now')),
+            updated_at DATETIME DEFAULT (datetime('now'))
+        )
+    ");
 }
 
 function seedAdmin(PDO $pdo): void

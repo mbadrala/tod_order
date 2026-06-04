@@ -16,32 +16,14 @@ class ClientController
 
     public function list(Request $request, Response $response): Response
     {
-        $isAdmin = $request->getAttribute('is_admin');
-
-        if ($isAdmin) {
-            $stmt = $this->pdo->query("SELECT * FROM clients ORDER BY created_at DESC");
-        } else {
-            $userId = $request->getAttribute('user_id');
-            $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC");
-            $stmt->execute([$userId]);
-        }
-
+        $stmt = $this->pdo->query("SELECT * FROM clients ORDER BY created_at DESC");
         return $this->json($response, $stmt->fetchAll());
     }
 
     public function get(Request $request, Response $response, array $args): Response
     {
-        $isAdmin = $request->getAttribute('is_admin');
-        $userId = $request->getAttribute('user_id');
-
-        if ($isAdmin) {
-            $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ?");
-            $stmt->execute([$args['id']]);
-        } else {
-            $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ? AND user_id = ?");
-            $stmt->execute([$args['id'], $userId]);
-        }
-
+        $stmt = $this->pdo->prepare("SELECT * FROM clients WHERE id = ?");
+        $stmt->execute([$args['id']]);
         $client = $stmt->fetch();
         if (!$client) {
             return $this->json($response, ['error' => 'not found'], 404);
@@ -97,17 +79,10 @@ class ClientController
 
     public function update(Request $request, Response $response, array $args): Response
     {
-        $isAdmin = $request->getAttribute('is_admin');
-        $userId = $request->getAttribute('user_id');
         $body = $request->getParsedBody();
 
-        if ($isAdmin) {
-            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ?");
-            $stmt->execute([$args['id']]);
-        } else {
-            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
-            $stmt->execute([$args['id'], $userId]);
-        }
+        $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ?");
+        $stmt->execute([$args['id']]);
 
         if (!$stmt->fetch()) {
             return $this->json($response, ['error' => 'not found'], 404);
@@ -149,16 +124,8 @@ class ClientController
 
     public function delete(Request $request, Response $response, array $args): Response
     {
-        $isAdmin = $request->getAttribute('is_admin');
-        $userId = $request->getAttribute('user_id');
-
-        if ($isAdmin) {
-            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ?");
-            $stmt->execute([$args['id']]);
-        } else {
-            $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ? AND user_id = ?");
-            $stmt->execute([$args['id'], $userId]);
-        }
+        $stmt = $this->pdo->prepare("SELECT id FROM clients WHERE id = ?");
+        $stmt->execute([$args['id']]);
 
         if (!$stmt->fetch()) {
             return $this->json($response, ['error' => 'not found'], 404);

@@ -1,9 +1,11 @@
 <?php
 
 use App\Controllers\AuthController;
+use App\Controllers\BankAccountController;
 use App\Controllers\ClientController;
 use App\Controllers\FileController;
 use App\Controllers\ProductController;
+use App\Controllers\SaleController;
 use App\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -81,6 +83,26 @@ $app->group('/files', function (RouteCollectorProxy $group) use ($fileController
     $group->post('/upload', [$fileController, 'upload']);
     $group->get('/{id}', [$fileController, 'get']);
     $group->delete('/{id}', [$fileController, 'delete']);
+})->add(new AuthMiddleware($config['jwt_secret']));
+
+$saleController = new SaleController($pdo);
+
+$app->group('/sales', function (RouteCollectorProxy $group) use ($saleController) {
+    $group->get('', [$saleController, 'list']);
+    $group->post('', [$saleController, 'create']);
+    $group->get('/{id}', [$saleController, 'get']);
+    $group->put('/{id}', [$saleController, 'update']);
+    $group->delete('/{id}', [$saleController, 'delete']);
+})->add(new AuthMiddleware($config['jwt_secret']));
+
+$bankAccountController = new BankAccountController($pdo);
+
+$app->group('/bank-accounts', function (RouteCollectorProxy $group) use ($bankAccountController) {
+    $group->get('', [$bankAccountController, 'list']);
+    $group->get('/{id}', [$bankAccountController, 'get']);
+    $group->post('', [$bankAccountController, 'create']);
+    $group->put('/{id}', [$bankAccountController, 'update']);
+    $group->delete('/{id}', [$bankAccountController, 'delete']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
 $app->run();

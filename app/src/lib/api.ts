@@ -124,6 +124,91 @@ export async function deleteProduct(id: number) {
   return request<{ message: string }>(`/products/${id}`, { method: 'DELETE' })
 }
 
+export interface Sale {
+  id: number
+  sale_date: string
+  client_code: string | null
+  client_name: string | null
+  client_phone: string | null
+  slip_number: string | null
+  status: string
+  total_amount: number
+  user_id: number
+  created_at: string
+  updated_at: string
+  items: SaleItem[]
+}
+
+export interface SaleItem {
+  id: number
+  sale_id: number
+  product_code: string
+  product_name: string
+  amount: number
+  unit_price: number
+  sum_price: number
+}
+
+export interface SaleInput {
+  sale_date: string
+  client_code?: string | null
+  client_name?: string | null
+  client_phone?: string | null
+  slip_number?: string | null
+  items: Array<{
+    product_code: string
+    product_name: string
+    amount: number
+    unit_price: number
+  }>
+}
+
+export async function getSales() {
+  return request<Sale[]>('/sales')
+}
+
+export async function getSale(id: number) {
+  return request<Sale>(`/sales/${id}`)
+}
+
+export async function createSale(data: SaleInput) {
+  return request<Sale>('/sales', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function updateSale(id: number, data: Partial<SaleInput>) {
+  return request<Sale>(`/sales/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export async function deleteSale(id: number) {
+  return request<{ message: string }>(`/sales/${id}`, { method: 'DELETE' })
+}
+
+export interface BankAccount {
+  id: number
+  bank_name: string
+  account_number: string
+  created_at: string
+  updated_at: string
+}
+
+export type BankAccountInput = { bank_name: string; account_number: string }
+
+export async function getBankAccounts() {
+  return request<BankAccount[]>('/bank-accounts')
+}
+
+export async function createBankAccount(data: BankAccountInput) {
+  return request<BankAccount>('/bank-accounts', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function updateBankAccount(id: number, data: Partial<BankAccountInput>) {
+  return request<BankAccount>(`/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export async function deleteBankAccount(id: number) {
+  return request<{ message: string }>(`/bank-accounts/${id}`, { method: 'DELETE' })
+}
+
 export function getFileUrl(id: number | string | null | undefined): string | null {
   if (!id) return null
   const token = localStorage.getItem('token')

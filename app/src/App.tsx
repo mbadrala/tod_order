@@ -3,10 +3,11 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import DashboardLayout from './components/DashboardLayout'
 import LoginPage from './pages/LoginPage'
-import HomePage from './pages/HomePage'
 import UsersPage from './pages/UsersPage'
 import ClientsPage from './pages/ClientsPage'
 import ProductsPage from './pages/ProductsPage'
+import SalesPage from './pages/SalesPage'
+import BankAccountsPage from './pages/BankAccountsPage'
 
 function App() {
   return (
@@ -19,7 +20,7 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<SalesPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route
@@ -27,6 +28,14 @@ function App() {
           element={
             <AdminRoute>
               <UsersPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/bank-accounts"
+          element={
+            <AdminRoute>
+              <BankAccountsPage />
             </AdminRoute>
           }
         />
