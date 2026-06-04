@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 function navItems(isAdmin: boolean) {
   const items = [
     { label: "Нүүр", path: "/" },
-    { label: "Үйлчлүүлэгчид", path: "/clients" },
+    { label: "Харилцагчид", path: "/clients" },
     { label: "Бүтээгдэхүүн", path: "/products" },
   ]
   if (isAdmin) items.push({ label: "Хэрэглэгчид", path: "/users" })

@@ -2,6 +2,7 @@
 
 use App\Controllers\AuthController;
 use App\Controllers\ClientController;
+use App\Controllers\FileController;
 use App\Controllers\ProductController;
 use App\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -74,26 +75,12 @@ $app->group('/products', function (RouteCollectorProxy $group) use ($productCont
     $group->delete('/{id}', [$productController, 'delete']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
-$app->group('/files', function (RouteCollectorProxy $group) {
-    $group->get('', function (Request $request, Response $response) {
-        $response->getBody()->write(json_encode(['message' => 'not implemented yet']));
-        return $response->withHeader('Content-Type', 'application/json');
-    });
+$fileController = new FileController($pdo, $config['upload_dir']);
 
-    $group->post('/upload', function (Request $request, Response $response) {
-        $response->getBody()->write(json_encode(['message' => 'not implemented yet']));
-        return $response->withHeader('Content-Type', 'application/json');
-    });
-
-    $group->get('/{id}', function (Request $request, Response $response, array $args) {
-        $response->getBody()->write(json_encode(['message' => 'not implemented yet']));
-        return $response->withHeader('Content-Type', 'application/json');
-    });
-
-    $group->delete('/{id}', function (Request $request, Response $response, array $args) {
-        $response->getBody()->write(json_encode(['message' => 'not implemented yet']));
-        return $response->withHeader('Content-Type', 'application/json');
-    });
+$app->group('/files', function (RouteCollectorProxy $group) use ($fileController) {
+    $group->post('/upload', [$fileController, 'upload']);
+    $group->get('/{id}', [$fileController, 'get']);
+    $group->delete('/{id}', [$fileController, 'delete']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
 $app->run();
