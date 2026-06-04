@@ -51,6 +51,7 @@ $app->group('/auth', function (RouteCollectorProxy $group) use ($authController)
     $group->post('/register', [$authController, 'register']);
     $group->get('/users', [$authController, 'listUsers']);
     $group->put('/users/{id}', [$authController, 'updateUser']);
+    $group->delete('/users/{id}', [$authController, 'deleteUser']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
 $clientController = new ClientController($pdo);

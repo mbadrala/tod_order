@@ -27,7 +27,6 @@ class AuthController
         $name = trim($body['name'] ?? '');
         $username = trim($body['username'] ?? '');
         $password = $body['password'] ?? '';
-        $isAdmin = !empty($body['is_admin']);
 
         if ($name === '' || $username === '' || $password === '') {
             return $this->json($response, ['error' => 'name, username, and password are required'], 400);
@@ -45,15 +44,15 @@ class AuthController
 
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $stmt = $this->pdo->prepare(
-            "INSERT INTO users (name, username, password_hash, is_admin) VALUES (?, ?, ?, ?)"
+            "INSERT INTO users (name, username, password_hash) VALUES (?, ?, ?)"
         );
-        $stmt->execute([$name, $username, $hash, $isAdmin ? 1 : 0]);
+        $stmt->execute([$name, $username, $hash]);
 
         $userId = $this->pdo->lastInsertId();
 
         return $this->json($response, [
             'message' => 'User created',
-            'user' => ['id' => (int)$userId, 'name' => $name, 'username' => $username, 'is_admin' => $isAdmin],
+            'user' => ['id' => (int)$userId, 'name' => $name, 'username' => $username],
         ], 201);
     }
 
@@ -91,11 +90,6 @@ class AuthController
             $params[] = password_hash($body['password'], PASSWORD_BCRYPT);
         }
 
-        if (array_key_exists('is_admin', $body)) {
-            $set[] = "is_admin = ?";
-            $params[] = $body['is_admin'] ? 1 : 0;
-        }
-
         if (empty($set)) {
             return $this->json($response, ['error' => 'no fields to update'], 400);
         }
@@ -107,6 +101,24 @@ class AuthController
 
         $stmt = $this->pdo->query("SELECT id, name, username, is_admin, created_at, updated_at FROM users WHERE id = {$args['id']}");
         return $this->json($response, $stmt->fetch());
+    }
+
+    public function deleteUser(Request $request, Response $response, array $args): Response
+    {
+        $stmt = $this->pdo->prepare("SELECT id, is_admin FROM users WHERE id = ?");
+        $stmt->execute([$args['id']]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            return $this->json($response, ['error' => 'user not found'], 404);
+        }
+
+        if ($user['is_admin']) {
+            return $this->json($response, ['error' => 'cannot delete admin'], 403);
+        }
+
+        $this->pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$args['id']]);
+        return $this->json($response, ['message' => 'deleted']);
     }
 
     public function login(Request $request, Response $response): Response

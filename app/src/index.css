@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
 
 @plugin "tailwindcss-animate";
 
@@ -97,6 +101,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --font-family-sans: "Inter", system-ui, sans-serif;
 }
 
 @layer base {
@@ -104,7 +109,6 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
-    font-family: system-ui, sans-serif;
+    @apply bg-background text-foreground font-sans;
   }
 }
