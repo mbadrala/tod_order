@@ -125,6 +125,19 @@ class ReportController
         return $this->json($response, $reports);
     }
 
+    public function delete(Request $request, Response $response, array $args): Response
+    {
+        if (!$request->getAttribute('is_admin')) {
+            return $this->json($response, ['error' => 'Зөвхөн админ'], 403);
+        }
+
+        $saleId = $args['sale_id'];
+        $this->pdo->prepare("DELETE FROM report_bank_allocations WHERE report_id IN (SELECT id FROM reports WHERE sale_id = ?)")->execute([$saleId]);
+        $this->pdo->prepare("DELETE FROM reports WHERE sale_id = ?")->execute([$saleId]);
+
+        return $this->json($response, ['message' => 'deleted']);
+    }
+
     private function json(Response $response, array $data, int $status = 200): Response
     {
         $response->getBody()->write(json_encode($data));

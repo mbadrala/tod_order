@@ -112,6 +112,7 @@ $reportController = new ReportController($pdo);
 
 $app->group('/reports', function (RouteCollectorProxy $group) use ($reportController) {
     $group->get('', [$reportController, 'list']);
+    $group->delete('/{sale_id}', [$reportController, 'delete']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
 $app->run();

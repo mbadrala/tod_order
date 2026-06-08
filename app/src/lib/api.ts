@@ -290,6 +290,10 @@ export async function listReports(filters: ReportFilters = {}) {
   return request<Report[]>(`/reports${qs ? '?' + qs : ''}`)
 }
 
+export async function deleteReport(saleId: number) {
+  return request<{ message: string }>(`/reports/${saleId}`, { method: 'DELETE' })
+}
+
 export function getFileUrl(id: number | string | null | undefined): string | null {
   if (!id) return null
   const token = localStorage.getItem('token')

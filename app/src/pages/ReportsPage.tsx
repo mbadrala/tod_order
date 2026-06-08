@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { DatePicker } from '@/components/ui/date-picker'
 import { ClientSelect } from '@/components/ui/client-select'
-import { listReports, getBankAccounts, getClients, getUsers, type BankAccount, type Client, type Report } from '@/lib/api'
+import { listReports, deleteReport, getBankAccounts, getClients, getUsers, type BankAccount, type Client, type Report } from '@/lib/api'
 import * as XLSX from 'xlsx'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -68,6 +69,7 @@ function ReportsPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [users, setUsers] = useState<Array<{ id: number; name: string }>>([])
   const [loading, setLoading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ sale_id: number; name: string } | null>(null)
 
   const loadMeta = async () => {
     try {
@@ -117,6 +119,17 @@ function ReportsPage() {
   const clearClient = () => {
     setClientCode('')
     setClientName('')
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteReport(deleteTarget.sale_id)
+      setDeleteTarget(null)
+      await fetchReport()
+    } catch {
+      setDeleteTarget(null)
+    }
   }
 
   const flatRows: FlatRow[] = useMemo(() => {
@@ -383,6 +396,7 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Дараа төлбөр</th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium">Бүртгэсэн ажилтан</th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium">Бүртгэсэн огноо</th>
+                {isAdmin() && <th className="whitespace-nowrap px-2 py-2 font-medium">Үйлдэл</th>}
               </tr>
             </thead>
             <tbody>
@@ -419,6 +433,14 @@ function ReportsPage() {
                           <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums" rowSpan={span}>{r.deferred_amount.toLocaleString('mn-MN')}</td>
                           <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.user_name}</td>
                           <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.created_at}</td>
+                          {isAdmin() && (
+                            <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>
+                              <Button variant="outline" size="xs" className="text-destructive"
+                                onClick={() => setDeleteTarget({ sale_id: r.sale_id, name: `${r.slip_number || `#${r.sale_id}`}` })}>
+                                Устгах
+                              </Button>
+                            </td>
+                          )}
                         </>
                       ) : null}
                     </tr>
@@ -430,6 +452,14 @@ function ReportsPage() {
           <p className="mt-2 text-xs text-muted-foreground">Нийт мөр: {flatRows.length}</p>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(v) => { if (!v) setDeleteTarget(null) }}
+        title="Тайлан устгах"
+        message={`Борлуулалт (${deleteTarget?.name ?? ''})-ын тайланг устгах уу?`}
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }
