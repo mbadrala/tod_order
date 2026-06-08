@@ -30,6 +30,7 @@ function buildExportName(from?: Date, to?: Date, clientCode?: string, clientName
 }
 
 interface FlatRow {
+  sale_id: number
   sale_date: string
   client_code: string
   client_name: string
@@ -126,6 +127,7 @@ function ReportsPage() {
         bankByAccountId[String(a.bank_account_id)] = a.amount
       }
       rows.push({
+        sale_id: r.sale_id,
         sale_date: r.sale_date,
         client_code: r.client_code || '',
         client_name: r.client_name || '',
@@ -145,6 +147,16 @@ function ReportsPage() {
     }
     return rows
   }, [data])
+
+  const saleSpanMap = useMemo(() => {
+    const map = new Map<number, { count: number; seen: boolean }>()
+    for (const r of flatRows) {
+      const entry = map.get(r.sale_id) || { count: 0, seen: false }
+      entry.count++
+      map.set(r.sale_id, entry)
+    }
+    return map
+  }, [flatRows])
 
   const exportName = useMemo(() =>
     buildExportName(fromDate, toDate, clientCode || undefined, clientName || undefined),
@@ -374,29 +386,45 @@ function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {flatRows.map((r, idx) => (
-                <tr key={idx} className="border-t">
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.sale_date}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.client_code}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.client_name}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.client_phone}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.slip_number}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.product_code}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.product_name}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.amount}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.unit_price.toLocaleString('mn-MN')}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums font-medium">{r.sum_price.toLocaleString('mn-MN')}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.cash_amount.toLocaleString('mn-MN')}</td>
-                  {bankAccounts.map((ba) => (
-                    <td key={ba.id} className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">
-                      {(r.bankAllocs[String(ba.id)] || 0).toLocaleString('mn-MN')}
-                    </td>
-                  ))}
-                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.deferred_amount.toLocaleString('mn-MN')}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.user_name}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">{r.created_at}</td>
-                </tr>
-              ))}
+              {(() => {
+                const seenSaleIds = new Set<number>()
+                return flatRows.map((r) => {
+                  const isFirst = !seenSaleIds.has(r.sale_id)
+                  if (isFirst) seenSaleIds.add(r.sale_id)
+                  const span = isFirst ? saleSpanMap.get(r.sale_id)?.count ?? 1 : 0
+                  return (
+                    <tr key={`${r.sale_id}-${r.product_code}-${Math.random()}`} className="border-t">
+                      {isFirst ? (
+                        <>
+                          <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.sale_date}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.client_code}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.client_name}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.client_phone}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.slip_number}</td>
+                        </>
+                      ) : null}
+                      <td className="whitespace-nowrap px-2 py-1.5">{r.product_code}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5">{r.product_name}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.amount}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">{r.unit_price.toLocaleString('mn-MN')}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums font-medium">{r.sum_price.toLocaleString('mn-MN')}</td>
+                      {isFirst ? (
+                        <>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums" rowSpan={span}>{r.cash_amount.toLocaleString('mn-MN')}</td>
+                          {bankAccounts.map((ba) => (
+                            <td key={ba.id} className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums" rowSpan={span}>
+                              {(r.bankAllocs[String(ba.id)] || 0).toLocaleString('mn-MN')}
+                            </td>
+                          ))}
+                          <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums" rowSpan={span}>{r.deferred_amount.toLocaleString('mn-MN')}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.user_name}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.created_at}</td>
+                        </>
+                      ) : null}
+                    </tr>
+                  )
+                })
+              })()}
             </tbody>
           </table>
           <p className="mt-2 text-xs text-muted-foreground">Нийт мөр: {flatRows.length}</p>
