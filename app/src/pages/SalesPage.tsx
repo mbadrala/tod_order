@@ -52,7 +52,24 @@ function SalesPage() {
   const [allocations, setAllocations] = useState<BankAllocForm[]>([])
   const [error, setError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
+  const [searchClientName, setSearchClientName] = useState('')
+  const [searchSlipNumber, setSearchSlipNumber] = useState('')
+  const [searchTotalMin, setSearchTotalMin] = useState('')
+  const [searchTotalMax, setSearchTotalMax] = useState('')
   const isAdmin = JSON.parse(localStorage.getItem('user') || '{}').is_admin
+
+  const filteredSales = useMemo(() => {
+    const nameQ = searchClientName.toLowerCase().trim()
+    const slipQ = searchSlipNumber.toLowerCase().trim()
+    const min = searchTotalMin === '' ? -Infinity : Number(searchTotalMin)
+    const max = searchTotalMax === '' ? Infinity : Number(searchTotalMax)
+    return sales.filter((s) => {
+      if (nameQ && !(s.client_name && s.client_name.toLowerCase().includes(nameQ))) return false
+      if (slipQ && !(s.slip_number && s.slip_number.toLowerCase().includes(slipQ))) return false
+      if (s.total_amount < min || s.total_amount > max) return false
+      return true
+    })
+  }, [sales, searchClientName, searchSlipNumber, searchTotalMin, searchTotalMax])
 
   const load = async () => {
     try {
@@ -287,7 +304,7 @@ function SalesPage() {
   ]
 
   const table = useReactTable({
-    data: sales,
+    data: filteredSales,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -300,6 +317,17 @@ function SalesPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Борлуулалт</h1>
         <Button onClick={openCreate}>Шинэ борлуулалт</Button>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3">
+        <input placeholder="Харилцагчийн нэр..." value={searchClientName} onChange={(e) => setSearchClientName(e.target.value)}
+          className="min-w-40 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
+        <input placeholder="Падааны дугаар..." value={searchSlipNumber} onChange={(e) => setSearchSlipNumber(e.target.value)}
+          className="min-w-40 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
+        <input placeholder="Дүн (min)..." value={searchTotalMin} onChange={(e) => setSearchTotalMin(e.target.value)}
+          className="w-32 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
+        <input placeholder="Дүн (max)..." value={searchTotalMax} onChange={(e) => setSearchTotalMax(e.target.value)}
+          className="w-32 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
       </div>
 
       <Separator className="mb-4" />
