@@ -146,6 +146,7 @@ export interface Sale {
   cash_amount: number
   deferred_amount: number
   user_id: number
+  user_name?: string
   created_at: string
   updated_at: string
   items: SaleItem[]
@@ -230,6 +231,63 @@ export async function updateBankAccount(id: number, data: Partial<BankAccountInp
 
 export async function deleteBankAccount(id: number) {
   return request<{ message: string }>(`/bank-accounts/${id}`, { method: 'DELETE' })
+}
+
+export interface ReportBankAllocation {
+  id: number
+  report_id: number
+  bank_account_id: number
+  bank_name: string
+  account_number: string
+  account_name: string
+  amount: number
+}
+
+export interface Report {
+  id: number
+  sale_id: number
+  sale_date: string
+  client_code: string | null
+  client_name: string | null
+  client_phone: string | null
+  slip_number: string | null
+  total_amount: number
+  cash_amount: number
+  deferred_amount: number
+  product_code: string
+  product_name: string
+  item_amount: number
+  unit_price: number
+  sum_price: number
+  user_id: number
+  user_name: string
+  created_at: string
+  bank_allocations: ReportBankAllocation[]
+}
+
+export interface ReportFilters {
+  from?: string
+  to?: string
+  client_code?: string
+  product_code?: string
+  product_name?: string
+  amount_min?: number
+  amount_max?: number
+  unit_price_min?: number
+  unit_price_max?: number
+  sum_price_min?: number
+  sum_price_max?: number
+  bank_account_id?: number
+  user_id?: number
+}
+
+export async function listReports(filters: ReportFilters = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<Report[]>(`/reports${qs ? '?' + qs : ''}`)
 }
 
 export function getFileUrl(id: number | string | null | undefined): string | null {

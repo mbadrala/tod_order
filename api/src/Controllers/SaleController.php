@@ -225,7 +225,7 @@ class SaleController
 
     public function list(Request $request, Response $response): Response
     {
-        $stmt = $this->pdo->query("SELECT * FROM sales ORDER BY sale_date DESC, id DESC");
+        $stmt = $this->pdo->query("SELECT s.*, u.name AS user_name FROM sales s LEFT JOIN users u ON s.user_id = u.id ORDER BY s.sale_date DESC, s.id DESC");
         $sales = $stmt->fetchAll();
 
         if (!empty($sales)) {
@@ -367,6 +367,10 @@ class SaleController
                 }
             }
 
+            if ($status === 'final') {
+                $this->generateReportRows($saleId);
+            }
+
             $this->pdo->commit();
 
             $stmt = $this->pdo->prepare("SELECT * FROM sales WHERE id = ?");
@@ -486,6 +490,7 @@ class SaleController
                             $a['bank_account_id'],
                             $a['bank_name'] ?? '',
                             $a['account_number'] ?? '',
+                            $a['account_name'] ?? '',
                             $a['amount'],
                         ]);
                     }
@@ -532,6 +537,7 @@ class SaleController
                             $a['bank_account_id'],
                             $a['bank_name'] ?? '',
                             $a['account_number'] ?? '',
+                            $a['account_name'] ?? '',
                             $a['amount'],
                         ]);
                     }
@@ -547,6 +553,12 @@ class SaleController
 
         if ($items !== null) {
             $this->pdo->commit();
+        }
+
+        $this->deleteReportRows($args['id']);
+        $finalStatus = $body['status'] ?? $sale['status'] ?? 'final';
+        if ($finalStatus === 'final') {
+            $this->generateReportRows($args['id']);
         }
 
         $stmt = $this->pdo->prepare("SELECT * FROM sales WHERE id = ?");
@@ -576,11 +588,82 @@ class SaleController
             return $this->json($response, ['error' => 'not found'], 404);
         }
 
+        $this->deleteReportRows($args['id']);
         $this->pdo->prepare("DELETE FROM sale_bank_allocations WHERE sale_id = ?")->execute([$args['id']]);
         $this->pdo->prepare("DELETE FROM sale_items WHERE sale_id = ?")->execute([$args['id']]);
         $this->pdo->prepare("DELETE FROM sales WHERE id = ?")->execute([$args['id']]);
 
         return $this->json($response, ['message' => 'deleted']);
+    }
+
+    private function generateReportRows(int $saleId): void
+    {
+        $stmt = $this->pdo->prepare("SELECT * FROM sales WHERE id = ?");
+        $stmt->execute([$saleId]);
+        $sale = $stmt->fetch();
+        if (!$sale || $sale['status'] !== 'final') return;
+
+        $stmt = $this->pdo->prepare("SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id");
+        $stmt->execute([$saleId]);
+        $items = $stmt->fetchAll();
+
+        $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id = ? ORDER BY id");
+        $stmt->execute([$saleId]);
+        $bankAllocs = $stmt->fetchAll();
+
+        $userName = '';
+        $stmt = $this->pdo->prepare("SELECT name FROM users WHERE id = ?");
+        $stmt->execute([$sale['user_id']]);
+        $u = $stmt->fetch();
+        if ($u) $userName = $u['name'];
+
+        $stmt = $this->pdo->prepare("
+            INSERT INTO reports (sale_id, sale_date, client_code, client_name, client_phone, slip_number, total_amount, cash_amount, deferred_amount, product_code, product_name, item_amount, unit_price, sum_price, user_id, user_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmtAlloc = $this->pdo->prepare("
+            INSERT INTO report_bank_allocations (report_id, bank_account_id, bank_name, account_number, account_name, amount)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+
+        foreach ($items as $item) {
+            $stmt->execute([
+                $saleId,
+                $sale['sale_date'],
+                $sale['client_code'],
+                $sale['client_name'],
+                $sale['client_phone'],
+                $sale['slip_number'],
+                $sale['total_amount'],
+                $sale['cash_amount'],
+                $sale['deferred_amount'],
+                $item['product_code'],
+                $item['product_name'],
+                $item['amount'],
+                $item['unit_price'],
+                $item['sum_price'],
+                $sale['user_id'],
+                $userName,
+            ]);
+            $reportId = $this->pdo->lastInsertId();
+
+            foreach ($bankAllocs as $a) {
+                $stmtAlloc->execute([
+                    $reportId,
+                    $a['bank_account_id'],
+                    $a['bank_name'],
+                    $a['account_number'],
+                    $a['account_name'] ?? '',
+                    $a['amount'],
+                ]);
+            }
+        }
+    }
+
+    private function deleteReportRows(int $saleId): void
+    {
+        $this->pdo->prepare("DELETE FROM report_bank_allocations WHERE report_id IN (SELECT id FROM reports WHERE sale_id = ?)")->execute([$saleId]);
+        $this->pdo->prepare("DELETE FROM reports WHERE sale_id = ?")->execute([$saleId]);
     }
 
     private function json(Response $response, array $data, int $status = 200): Response

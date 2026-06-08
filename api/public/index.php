@@ -5,6 +5,7 @@ use App\Controllers\BankAccountController;
 use App\Controllers\ClientController;
 use App\Controllers\FileController;
 use App\Controllers\ProductController;
+use App\Controllers\ReportController;
 use App\Controllers\SaleController;
 use App\Middleware\AuthMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -105,6 +106,12 @@ $app->group('/bank-accounts', function (RouteCollectorProxy $group) use ($bankAc
     $group->post('', [$bankAccountController, 'create']);
     $group->put('/{id}', [$bankAccountController, 'update']);
     $group->delete('/{id}', [$bankAccountController, 'delete']);
+})->add(new AuthMiddleware($config['jwt_secret']));
+
+$reportController = new ReportController($pdo);
+
+$app->group('/reports', function (RouteCollectorProxy $group) use ($reportController) {
+    $group->get('', [$reportController, 'list']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
 $app->run();

@@ -3,17 +3,30 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { DatePicker } from '@/components/ui/date-picker'
 import { ClientSelect } from '@/components/ui/client-select'
-import { getBankAccounts, getClients, type BankAccount, type Client, type Sale, type SaleItem, type SaleBankAllocation } from '@/lib/api'
+import { listReports, getBankAccounts, getClients, getUsers, type BankAccount, type Client, type Report } from '@/lib/api'
 import * as XLSX from 'xlsx'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
-function authHeaders() {
+function getTokenPayload() {
   const token = localStorage.getItem('token')
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  if (!token) return null
+  try {
+    return JSON.parse(atob(token.split('.')[1]))
+  } catch { return null }
+}
+
+const isAdmin = () => getTokenPayload()?.is_admin ?? false
+
+function buildExportName(from?: Date, to?: Date, clientCode?: string, clientName?: string): string {
+  const parts: string[] = ['export']
+  if (from) parts.push('from_' + from.toISOString().slice(0, 10))
+  if (to) parts.push('to_' + to.toISOString().slice(0, 10))
+  if (clientCode) {
+    const label = clientName ? `${clientName}_${clientCode}` : clientCode
+    parts.push(label.replace(/[^a-zA-Z0-9_\-\u0400-\u04ff]/g, '_'))
   }
+  return parts.join('_')
 }
 
 interface FlatRow {
@@ -34,25 +47,25 @@ interface FlatRow {
   bankAllocs: Record<string, number>
 }
 
-function buildExportName(from?: Date, to?: Date, clientCode?: string, clientName?: string): string {
-  const parts: string[] = ['export']
-  if (from) parts.push('from_' + from.toISOString().slice(0, 10))
-  if (to) parts.push('to_' + to.toISOString().slice(0, 10))
-  if (clientCode) {
-    const label = clientName ? `${clientName}_${clientCode}` : clientCode
-    parts.push(label.replace(/[^a-zA-Z0-9_\-\u0400-\u04ff]/g, '_'))
-  }
-  return parts.join('_')
-}
-
 function ReportsPage() {
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined)
   const [toDate, setToDate] = useState<Date | undefined>(undefined)
   const [clientCode, setClientCode] = useState('')
   const [clientName, setClientName] = useState('')
-  const [data, setData] = useState<Sale[]>([])
+  const [productCode, setProductCode] = useState('')
+  const [productName, setProductName] = useState('')
+  const [amountMin, setAmountMin] = useState('')
+  const [amountMax, setAmountMax] = useState('')
+  const [unitPriceMin, setUnitPriceMin] = useState('')
+  const [unitPriceMax, setUnitPriceMax] = useState('')
+  const [sumPriceMin, setSumPriceMin] = useState('')
+  const [sumPriceMax, setSumPriceMax] = useState('')
+  const [bankAccountId, setBankAccountId] = useState('')
+  const [filterUserId, setFilterUserId] = useState('')
+  const [data, setData] = useState<Report[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [users, setUsers] = useState<Array<{ id: number; name: string }>>([])
   const [loading, setLoading] = useState(false)
 
   const loadMeta = async () => {
@@ -60,6 +73,10 @@ function ReportsPage() {
       const [c, b] = await Promise.all([getClients(), getBankAccounts()])
       setClients(c)
       setBankAccounts(b)
+      if (isAdmin()) {
+        const u = await getUsers()
+        setUsers(u)
+      }
     } catch { /* ignore */ }
   }
 
@@ -68,18 +85,26 @@ function ReportsPage() {
   const fetchReport = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (fromDate) params.set('from', fromDate.toISOString().slice(0, 10))
-      if (toDate) params.set('to', toDate.toISOString().slice(0, 10))
-      if (clientCode.trim()) params.set('client_code', clientCode.trim())
+      const filters: Record<string, any> = {}
+      if (fromDate) filters.from = fromDate.toISOString().slice(0, 10)
+      if (toDate) filters.to = toDate.toISOString().slice(0, 10)
+      if (clientCode.trim()) filters.client_code = clientCode.trim()
+      if (productCode.trim()) filters.product_code = productCode.trim()
+      if (productName.trim()) filters.product_name = productName.trim()
+      if (amountMin) filters.amount_min = Number(amountMin)
+      if (amountMax) filters.amount_max = Number(amountMax)
+      if (unitPriceMin) filters.unit_price_min = Number(unitPriceMin)
+      if (unitPriceMax) filters.unit_price_max = Number(unitPriceMax)
+      if (sumPriceMin) filters.sum_price_min = Number(sumPriceMin)
+      if (sumPriceMax) filters.sum_price_max = Number(sumPriceMax)
+      if (bankAccountId) filters.bank_account_id = Number(bankAccountId)
+      if (filterUserId) filters.user_id = Number(filterUserId)
 
-      const res = await fetch(`${API_BASE}/sales/report?${params}`, { headers: authHeaders() })
-      const json = await res.json()
-      if (res.ok) setData(json)
-      else setData([])
+      const result = await listReports(filters)
+      setData(result)
     } catch { setData([]) }
     setLoading(false)
-  }, [fromDate, toDate, clientCode])
+  }, [fromDate, toDate, clientCode, productCode, productName, amountMin, amountMax, unitPriceMin, unitPriceMax, sumPriceMin, sumPriceMax, bankAccountId, filterUserId])
 
   useEffect(() => { fetchReport() }, [fetchReport])
 
@@ -95,32 +120,28 @@ function ReportsPage() {
 
   const flatRows: FlatRow[] = useMemo(() => {
     const rows: FlatRow[] = []
-    for (const sale of data) {
-      const items: SaleItem[] = sale.items || []
-      const allocs: SaleBankAllocation[] = sale.bank_allocations || []
+    for (const r of data) {
       const bankByAccountId: Record<string, number> = {}
-      for (const a of allocs) {
+      for (const a of r.bank_allocations || []) {
         bankByAccountId[String(a.bank_account_id)] = a.amount
       }
-      for (const item of items) {
-        rows.push({
-          sale_date: sale.sale_date,
-          client_code: sale.client_code || '',
-          client_name: sale.client_name || '',
-          client_phone: sale.client_phone || '',
-          slip_number: sale.slip_number || '',
-          product_code: item.product_code,
-          product_name: item.product_name,
-          amount: item.amount,
-          unit_price: item.unit_price,
-          sum_price: item.sum_price,
-          cash_amount: sale.cash_amount ?? 0,
-          deferred_amount: sale.deferred_amount ?? 0,
-          user_name: (sale as any).user_name || '',
-          created_at: sale.created_at,
-          bankAllocs: { ...bankByAccountId },
-        })
-      }
+      rows.push({
+        sale_date: r.sale_date,
+        client_code: r.client_code || '',
+        client_name: r.client_name || '',
+        client_phone: r.client_phone || '',
+        slip_number: r.slip_number || '',
+        product_code: r.product_code,
+        product_name: r.product_name,
+        amount: r.item_amount,
+        unit_price: r.unit_price,
+        sum_price: r.sum_price,
+        cash_amount: r.cash_amount,
+        deferred_amount: r.deferred_amount,
+        user_name: r.user_name,
+        created_at: r.created_at,
+        bankAllocs: { ...bankByAccountId },
+      })
     }
     return rows
   }, [data])
@@ -135,6 +156,16 @@ function ReportsPage() {
     if (fromDate) params.set('from', fromDate.toISOString().slice(0, 10))
     if (toDate) params.set('to', toDate.toISOString().slice(0, 10))
     if (clientCode.trim()) params.set('client_code', clientCode.trim())
+    if (productCode.trim()) params.set('product_code', productCode.trim())
+    if (productName.trim()) params.set('product_name', productName.trim())
+    if (amountMin) params.set('amount_min', amountMin)
+    if (amountMax) params.set('amount_max', amountMax)
+    if (unitPriceMin) params.set('unit_price_min', unitPriceMin)
+    if (unitPriceMax) params.set('unit_price_max', unitPriceMax)
+    if (sumPriceMin) params.set('sum_price_min', sumPriceMin)
+    if (sumPriceMax) params.set('sum_price_max', sumPriceMax)
+    if (bankAccountId) params.set('bank_account_id', bankAccountId)
+    if (filterUserId) params.set('user_id', filterUserId)
     const token = localStorage.getItem('token')
     const url = `${API_BASE}/sales/report/pdf?${params}&token=${encodeURIComponent(token || '')}`
     window.open(url, '_blank')
@@ -201,6 +232,112 @@ function ReportsPage() {
             )}
           </div>
         </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Барааны код</p>
+          <input
+            className="flex h-9 w-40 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="Барааны код"
+            value={productCode}
+            onChange={(e) => setProductCode(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Барааны нэр</p>
+          <input
+            className="flex h-9 w-40 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="Барааны нэр"
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Тоо хэмжээ (доод)</p>
+          <input
+            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="доод"
+            type="number"
+            value={amountMin}
+            onChange={(e) => setAmountMin(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Тоо хэмжээ (дээд)</p>
+          <input
+            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="дээд"
+            type="number"
+            value={amountMax}
+            onChange={(e) => setAmountMax(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Нэгж үнэ (доод)</p>
+          <input
+            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="доод"
+            type="number"
+            value={unitPriceMin}
+            onChange={(e) => setUnitPriceMin(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Нэгж үнэ (дээд)</p>
+          <input
+            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="дээд"
+            type="number"
+            value={unitPriceMax}
+            onChange={(e) => setUnitPriceMax(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Дүн (доод)</p>
+          <input
+            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="доод"
+            type="number"
+            value={sumPriceMin}
+            onChange={(e) => setSumPriceMin(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Дүн (дээд)</p>
+          <input
+            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            placeholder="дээд"
+            type="number"
+            value={sumPriceMax}
+            onChange={(e) => setSumPriceMax(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Банкны данс</p>
+          <select
+            className="flex h-9 w-44 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            value={bankAccountId}
+            onChange={(e) => setBankAccountId(e.target.value)}
+          >
+            <option value="">Бүгд</option>
+            {bankAccounts.map((ba) => (
+              <option key={ba.id} value={ba.id}>{ba.account_name || ba.bank_name} - {ba.account_number}</option>
+            ))}
+          </select>
+        </div>
+        {isAdmin() && (
+          <div>
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Ажилтан</p>
+            <select
+              className="flex h-9 w-44 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={filterUserId}
+              onChange={(e) => setFilterUserId(e.target.value)}
+            >
+              <option value="">Бүгд</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <Button variant="default" onClick={fetchReport}>Хайх</Button>
       </div>
 

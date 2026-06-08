@@ -167,6 +167,42 @@ function initializeDatabase(PDO $pdo): void
             FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
         )
     ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            sale_date TEXT NOT NULL,
+            client_code TEXT,
+            client_name TEXT,
+            client_phone TEXT,
+            slip_number TEXT,
+            total_amount REAL NOT NULL DEFAULT 0,
+            cash_amount REAL NOT NULL DEFAULT 0,
+            deferred_amount REAL NOT NULL DEFAULT 0,
+            product_code TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            item_amount REAL NOT NULL DEFAULT 1,
+            unit_price REAL NOT NULL DEFAULT 0,
+            sum_price REAL NOT NULL DEFAULT 0,
+            user_id INTEGER NOT NULL,
+            user_name TEXT,
+            created_at DATETIME DEFAULT (datetime('now'))
+        )
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS report_bank_allocations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            report_id INTEGER NOT NULL,
+            bank_account_id INTEGER NOT NULL,
+            bank_name TEXT NOT NULL,
+            account_number TEXT NOT NULL,
+            account_name TEXT NOT NULL DEFAULT '',
+            amount REAL NOT NULL DEFAULT 0,
+            FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE
+        )
+    ");
 }
 
 function seedAdmin(PDO $pdo): void

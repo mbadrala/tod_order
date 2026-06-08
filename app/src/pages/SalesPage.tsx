@@ -289,6 +289,12 @@ function SalesPage() {
       cell: ({ row }) => row.original.items?.length ?? '-',
     },
     {
+      id: 'user_name',
+      header: 'Бүртгэсэн',
+      accessorKey: 'user_name',
+      cell: ({ getValue }) => String(getValue() ?? '-'),
+    },
+    {
       id: 'actions',
       header: 'Үйлдэл',
       cell: ({ row }) => (
@@ -324,9 +330,9 @@ function SalesPage() {
           className="min-w-40 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
         <input placeholder="Падааны дугаар..." value={searchSlipNumber} onChange={(e) => setSearchSlipNumber(e.target.value)}
           className="min-w-40 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
-        <input placeholder="Дүн (min)..." value={searchTotalMin} onChange={(e) => setSearchTotalMin(e.target.value)}
+        <input placeholder="Дүн (доод)..." value={searchTotalMin} onChange={(e) => setSearchTotalMin(e.target.value)}
           className="w-32 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
-        <input placeholder="Дүн (max)..." value={searchTotalMax} onChange={(e) => setSearchTotalMax(e.target.value)}
+        <input placeholder="Дүн (дээд)..." value={searchTotalMax} onChange={(e) => setSearchTotalMax(e.target.value)}
           className="w-32 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50" />
       </div>
 
