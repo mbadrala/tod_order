@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,6 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Dialog, DialogPortal, DialogBackdrop, DialogPopup, DialogTitle, DialogClose } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { getClients, createClient, updateClient, deleteClient, uploadFile, getFileUrl, type Client, type ClientInput } from '@/lib/api'
+import * as XLSX from 'xlsx'
 
 function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
@@ -24,6 +25,19 @@ function ClientsPage() {
   const [uploading, setUploading] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
+  const [searchCode, setSearchCode] = useState('')
+  const [searchName, setSearchName] = useState('')
+  const isAdmin = JSON.parse(localStorage.getItem('user') || '{}').is_admin
+
+  const filteredClients = useMemo(() => {
+    const codeQ = searchCode.toLowerCase().trim()
+    const nameQ = searchName.toLowerCase().trim()
+    return clients.filter((c) => {
+      if (codeQ && !(c.client_code && c.client_code.toLowerCase().includes(codeQ))) return false
+      if (nameQ && !(c.name && c.name.toLowerCase().includes(nameQ))) return false
+      return true
+    })
+  }, [clients, searchCode, searchName])
 
   const load = async () => {
     try { setClients(await getClients()) } catch { /* ignore */ }
@@ -117,6 +131,26 @@ function ClientsPage() {
     }
   }
 
+  const exportExcel = () => {
+    const headers = ['Код', 'Нэр', 'Утас', 'Эзэмшигч', 'Дүүрэг', 'Хороо', 'Хороолол', 'Барилга, хаалга', 'Төлөв', 'Бүртгэгдсэн']
+    const body = filteredClients.map((c) => [
+      c.client_code || '',
+      c.name,
+      c.phone || '',
+      c.owner_name || '',
+      c.district || '',
+      c.subdistrict || '',
+      c.neighborhood || '',
+      c.building_door || '',
+      c.status === 'active' ? 'Идэвхтэй' : c.status === 'inactive' ? 'Идэвхгүй' : '',
+      c.created_at?.slice(0, 10) || '',
+    ])
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...body])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Харилцагчид')
+    XLSX.writeFile(wb, `clients_export_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
   const columns: ColumnDef<Client>[] = [
     {
       accessorKey: 'client_code',
@@ -195,15 +229,17 @@ function ClientsPage() {
       cell: ({ row }) => (
         <div className="flex gap-1">
           <Button variant="outline" size="xs" onClick={() => openEdit(row.original)}>Засах</Button>
-          <Button variant="outline" size="xs" className="text-destructive"
-            onClick={() => handleDelete(row.original.id, row.original.name)}>Устгах</Button>
+          {isAdmin && (
+            <Button variant="outline" size="xs" className="text-destructive"
+              onClick={() => handleDelete(row.original.id, row.original.name)}>Устгах</Button>
+          )}
         </div>
       ),
     },
   ]
 
   const table = useReactTable({
-    data: clients,
+    data: filteredClients,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -215,7 +251,25 @@ function ClientsPage() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Харилцагчид</h1>
-        <Button onClick={openCreate}>Шинэ харилцагч</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportExcel}>Excel экспорт</Button>
+          <Button onClick={openCreate}>Шинэ харилцагч</Button>
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3">
+        <input
+          placeholder="Кодоор хайх..."
+          value={searchCode}
+          onChange={(e) => setSearchCode(e.target.value)}
+          className="min-w-48 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
+        />
+        <input
+          placeholder="Нэрээр хайх..."
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          className="min-w-48 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
+        />
       </div>
 
       <Separator className="mb-4" />
