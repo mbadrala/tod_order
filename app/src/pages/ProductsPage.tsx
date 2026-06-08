@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,6 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Dialog, DialogPortal, DialogBackdrop, DialogPopup, DialogTitle, DialogClose } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { getProducts, createProduct, updateProduct, deleteProduct, type Product, type ProductInput } from '@/lib/api'
+import * as XLSX from 'xlsx'
 
 function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -22,8 +23,29 @@ function ProductsPage() {
   const [form, setForm] = useState<ProductInput>({ code: '', name: '' })
   const [error, setError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
+  const [searchCode, setSearchCode] = useState('')
+  const [searchName, setSearchName] = useState('')
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   const isAdmin = user.is_admin
+
+  const filteredProducts = useMemo(() => {
+    const codeQ = searchCode.toLowerCase().trim()
+    const nameQ = searchName.toLowerCase().trim()
+    return products.filter((p) => {
+      if (codeQ && !p.code.toLowerCase().includes(codeQ)) return false
+      if (nameQ && !p.name.toLowerCase().includes(nameQ)) return false
+      return true
+    })
+  }, [products, searchCode, searchName])
+
+  const exportExcel = () => {
+    const headers = ['Код', 'Нэр', 'Бүртгэгдсэн']
+    const body = filteredProducts.map((p) => [p.code, p.name, p.created_at?.slice(0, 10) || ''])
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...body])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Бараа')
+    XLSX.writeFile(wb, `products_export_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
 
   const load = async () => {
     try { setProducts(await getProducts()) } catch { /* ignore */ }
@@ -119,7 +141,7 @@ function ProductsPage() {
   ]
 
   const table = useReactTable({
-    data: products,
+    data: filteredProducts,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -131,7 +153,25 @@ function ProductsPage() {
     <div className="mx-auto max-w-4xl">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Бараа</h1>
-        {isAdmin && <Button onClick={openCreate}>Шинэ бараа</Button>}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportExcel}>Excel экспорт</Button>
+          {isAdmin && <Button onClick={openCreate}>Шинэ бараа</Button>}
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3">
+        <input
+          placeholder="Кодоор хайх..."
+          value={searchCode}
+          onChange={(e) => setSearchCode(e.target.value)}
+          className="min-w-48 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
+        />
+        <input
+          placeholder="Нэрээр хайх..."
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          className="min-w-48 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
+        />
       </div>
 
       <Separator className="mb-4" />
