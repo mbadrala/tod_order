@@ -53,8 +53,8 @@ class ProductController
             return $this->json($response, ['error' => 'code already exists'], 409);
         }
 
-        $stmt = $this->pdo->prepare("INSERT INTO products (code, name) VALUES (?, ?)");
-        $stmt->execute([$code, $name]);
+        $stmt = $this->pdo->prepare("INSERT INTO products (code, name, created_at) VALUES (?, ?, ?)");
+        $stmt->execute([$code, $name, date('Y-m-d H:i:s')]);
 
         $id = $this->pdo->lastInsertId();
         $stmt = $this->pdo->prepare("SELECT * FROM products WHERE id = ?");
@@ -99,7 +99,8 @@ class ProductController
             }
         }
 
-        $set[] = "updated_at = datetime('now')";
+        $set[] = "updated_at = ?";
+        $params[] = date('Y-m-d H:i:s');
         $params[] = $args['id'];
 
         $this->pdo->prepare("UPDATE products SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);

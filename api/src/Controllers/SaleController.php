@@ -330,10 +330,10 @@ class SaleController
         $this->pdo->beginTransaction();
         try {
             $stmt = $this->pdo->prepare("
-                INSERT INTO sales (sale_date, client_code, client_name, client_phone, slip_number, status, total_amount, cash_amount, deferred_amount, discount_amount, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO sales (sale_date, client_code, client_name, client_phone, slip_number, status, total_amount, cash_amount, deferred_amount, discount_amount, user_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$saleDate, $clientCode, $clientName, $clientPhone, $slipNumber, $status, $totalAmount, $cashAmount, $deferredAmount, $discountAmount, $userId]);
+            $stmt->execute([$saleDate, $clientCode, $clientName, $clientPhone, $slipNumber, $status, $totalAmount, $cashAmount, $deferredAmount, $discountAmount, $userId, date('Y-m-d H:i:s')]);
             $saleId = $this->pdo->lastInsertId();
 
             $stmt = $this->pdo->prepare("
@@ -549,7 +549,8 @@ class SaleController
         }
 
         if (!empty($set)) {
-            $set[] = "updated_at = datetime('now')";
+            $set[] = "updated_at = ?";
+            $params[] = date('Y-m-d H:i:s');
             $params[] = $args['id'];
             $this->pdo->prepare("UPDATE sales SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);
         }
@@ -620,9 +621,10 @@ class SaleController
         $u = $stmt->fetch();
         if ($u) $userName = $u['name'];
 
+        $now = date('Y-m-d H:i:s');
         $stmt = $this->pdo->prepare("
-            INSERT INTO reports (sale_id, sale_date, client_code, client_name, client_phone, slip_number, total_amount, cash_amount, deferred_amount, discount_amount, product_code, product_name, item_amount, unit_price, sum_price, user_id, user_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO reports (sale_id, sale_date, client_code, client_name, client_phone, slip_number, total_amount, cash_amount, deferred_amount, discount_amount, product_code, product_name, item_amount, unit_price, sum_price, user_id, user_name, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmtAlloc = $this->pdo->prepare("
             INSERT INTO report_bank_allocations (report_id, bank_account_id, bank_name, account_number, account_name, amount)
@@ -648,6 +650,7 @@ class SaleController
                 $item['sum_price'],
                 $sale['user_id'],
                 $userName,
+                $now,
             ]);
             $reportId = $this->pdo->lastInsertId();
 

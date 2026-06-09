@@ -40,9 +40,9 @@ class FileController
         $uploadedFile->moveTo("{$this->uploadDir}/$storedName");
 
         $stmt = $this->pdo->prepare(
-            "INSERT INTO files (user_id, original_name, stored_name, mime_type, size) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO files (user_id, original_name, stored_name, mime_type, size, created_at) VALUES (?, ?, ?, ?, ?, ?)"
         );
-        $stmt->execute([$userId, $originalName, $storedName, $mimeType, $size]);
+        $stmt->execute([$userId, $originalName, $storedName, $mimeType, $size, date('Y-m-d H:i:s')]);
 
         $fileId = $this->pdo->lastInsertId();
 

@@ -48,8 +48,8 @@ class BankAccountController
             return $this->json($response, ['error' => 'bank name, account name and account number are required'], 400);
         }
 
-        $stmt = $this->pdo->prepare("INSERT INTO bank_accounts (bank_name, account_number, account_name) VALUES (?, ?, ?)");
-        $stmt->execute([$bankName, $accountNumber, $accountName]);
+        $stmt = $this->pdo->prepare("INSERT INTO bank_accounts (bank_name, account_number, account_name, created_at) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$bankName, $accountNumber, $accountName, date('Y-m-d H:i:s')]);
 
         $id = $this->pdo->lastInsertId();
         $stmt = $this->pdo->prepare("SELECT * FROM bank_accounts WHERE id = ?");
@@ -86,7 +86,8 @@ class BankAccountController
             return $this->json($response, ['error' => 'no fields to update'], 400);
         }
 
-        $set[] = "updated_at = datetime('now')";
+        $set[] = "updated_at = ?";
+        $params[] = date('Y-m-d H:i:s');
         $params[] = $args['id'];
 
         $this->pdo->prepare("UPDATE bank_accounts SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);

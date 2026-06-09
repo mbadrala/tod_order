@@ -1,5 +1,7 @@
 <?php
 
+date_default_timezone_set('Asia/Ulaanbaatar');
+
 use App\Controllers\AuthController;
 use App\Controllers\BankAccountController;
 use App\Controllers\ClientController;

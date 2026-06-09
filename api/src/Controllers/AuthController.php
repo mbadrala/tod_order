@@ -44,9 +44,9 @@ class AuthController
 
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $stmt = $this->pdo->prepare(
-            "INSERT INTO users (name, username, password_hash) VALUES (?, ?, ?)"
+            "INSERT INTO users (name, username, password_hash, created_at) VALUES (?, ?, ?, ?)"
         );
-        $stmt->execute([$name, $username, $hash]);
+        $stmt->execute([$name, $username, $hash, date('Y-m-d H:i:s')]);
 
         $userId = $this->pdo->lastInsertId();
 
@@ -101,7 +101,8 @@ class AuthController
             return $this->json($response, ['error' => 'no fields to update'], 400);
         }
 
-        $set[] = "updated_at = datetime('now')";
+        $set[] = "updated_at = ?";
+        $params[] = date('Y-m-d H:i:s');
         $params[] = $args['id'];
 
         $this->pdo->prepare("UPDATE users SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);

@@ -228,8 +228,8 @@ function seedAdmin(PDO $pdo): void
         $password = $_ENV['ADMIN_PASSWORD'] ?? 'admin';
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $stmt = $pdo->prepare(
-            "INSERT INTO users (name, username, password_hash, is_admin) VALUES (?, ?, ?, 1)"
+            "INSERT INTO users (name, username, password_hash, is_admin, created_at) VALUES (?, ?, ?, 1, ?)"
         );
-        $stmt->execute(['Administrator', 'admin', $hash]);
+        $stmt->execute(['Administrator', 'admin', $hash, date('Y-m-d H:i:s')]);
     }
 }

@@ -52,8 +52,8 @@ class ClientController
         }
 
         $stmt = $this->pdo->prepare("
-            INSERT INTO clients (user_id, client_code, name, phone, owner_name, outdoor_photo, indoor_photo, district, subdistrict, neighborhood, building_door, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clients (user_id, client_code, name, phone, owner_name, outdoor_photo, indoor_photo, district, subdistrict, neighborhood, building_door, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $userId,
@@ -68,6 +68,7 @@ class ClientController
             $body['neighborhood'] ?? null,
             $body['building_door'] ?? null,
             $body['status'] ?? null,
+            date('Y-m-d H:i:s'),
         ]);
 
         $id = $this->pdo->lastInsertId();
@@ -111,7 +112,8 @@ class ClientController
             }
         }
 
-        $set[] = "updated_at = datetime('now')";
+        $set[] = "updated_at = ?";
+        $params[] = date('Y-m-d H:i:s');
         $params[] = $args['id'];
 
         $this->pdo->prepare("UPDATE clients SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);
