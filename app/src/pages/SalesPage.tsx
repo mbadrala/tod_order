@@ -637,7 +637,7 @@ function SalesPage() {
                 <div className="flex items-center gap-2">
                   <label
                     htmlFor="discount-switch"
-                    className="text-xs text-muted-foreground cursor-pointer select-none"
+                    className="text-sm font-medium cursor-pointer select-none"
                   >
                     Хөнгөлөлт
                   </label>
