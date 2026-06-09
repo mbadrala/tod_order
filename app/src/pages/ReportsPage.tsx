@@ -44,6 +44,7 @@ interface FlatRow {
   sum_price: number
   cash_amount: number
   deferred_amount: number
+  discount_amount: number
   user_name: string
   created_at: string
   bankAllocs: Record<string, number>
@@ -153,6 +154,7 @@ function ReportsPage() {
         sum_price: r.sum_price,
         cash_amount: r.cash_amount,
         deferred_amount: r.deferred_amount,
+        discount_amount: r.discount_amount ?? 0,
         user_name: r.user_name,
         created_at: r.created_at,
         bankAllocs: { ...bankByAccountId },
@@ -202,14 +204,14 @@ function ReportsPage() {
       'Падааны дугаар', 'Барааны код', 'Барааны нэр', 'Тоо хэмжээ',
       'Нэгж үнэ', 'Дүн', 'Бэлэн',
       ...bankAccounts.map((ba, i) => (ba.account_name || ba.bank_name || `Данс ${i + 1}`)),
-      'Дараа төлбөр', 'Бүртгэсэн ажилтан', 'Бүртгэсэн огноо',
+      'Дараа төлбөр', 'Хөнгөлөлт', 'Бүртгэсэн ажилтан', 'Бүртгэсэн огноо',
     ]
     const body = flatRows.map((r) => [
       r.sale_date, r.client_code, r.client_name, r.client_phone,
       r.slip_number, r.product_code, r.product_name, r.amount,
       r.unit_price, r.sum_price, r.cash_amount,
       ...bankAccounts.map((ba) => r.bankAllocs[String(ba.id)] || 0),
-      r.deferred_amount, r.user_name, r.created_at,
+      r.deferred_amount, r.discount_amount, r.user_name, r.created_at,
     ])
     const ws = XLSX.utils.aoa_to_sheet([headers, ...body])
     const wb = XLSX.utils.book_new()
@@ -394,6 +396,7 @@ function ReportsPage() {
                   </th>
                 ))}
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Дараа төлбөр</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Хөнгөлөлт</th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium">Бүртгэсэн ажилтан</th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium">Бүртгэсэн огноо</th>
                 {isAdmin() && <th className="whitespace-nowrap px-2 py-2 font-medium">Үйлдэл</th>}
@@ -431,6 +434,7 @@ function ReportsPage() {
                             </td>
                           ))}
                           <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums" rowSpan={span}>{r.deferred_amount.toLocaleString('mn-MN')}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-green-600" rowSpan={span}>{r.discount_amount > 0 ? r.discount_amount.toLocaleString('mn-MN') : '-'}</td>
                           <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.user_name}</td>
                           <td className="whitespace-nowrap px-2 py-1.5" rowSpan={span}>{r.created_at}</td>
                           {isAdmin() && (

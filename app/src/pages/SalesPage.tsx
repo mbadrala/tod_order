@@ -8,6 +8,7 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -82,6 +83,8 @@ function SalesPage() {
   const [items, setItems] = useState<LineItemForm[]>([emptyLine()]);
   const [cashAmount, setCashAmount] = useState(0);
   const [deferredAmount, setDeferredAmount] = useState(0);
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
   const [allocations, setAllocations] = useState<BankAllocForm[]>([]);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -151,6 +154,8 @@ function SalesPage() {
     setItems([emptyLine()]);
     setCashAmount(0);
     setDeferredAmount(0);
+    setDiscountEnabled(false);
+    setDiscountAmount(0);
     setAllocations([]);
     setEditId(null);
     setError("");
@@ -164,6 +169,8 @@ function SalesPage() {
     setSlipNumber(s.slip_number || "");
     setCashAmount(s.cash_amount);
     setDeferredAmount(s.deferred_amount);
+    setDiscountAmount(s.discount_amount ?? 0);
+    setDiscountEnabled((s.discount_amount ?? 0) > 0);
     setItems(
       s.items.map((i) => ({
         product_code: i.product_code,
@@ -258,7 +265,7 @@ function SalesPage() {
       setError("Дор хаяж нэг бараа оруулна уу");
       return;
     }
-    if (status === "final" && allocTotal < totalSum) {
+    if (status === "final" && allocTotal < totalSum - discountAmount) {
       setError("Хуваарилалтын дүн нийт дүнгээс бага байна");
       return;
     }
@@ -272,6 +279,7 @@ function SalesPage() {
         status,
         cash_amount: cashAmount || 0,
         deferred_amount: deferredAmount || 0,
+        discount_amount: discountEnabled ? (discountAmount || 0) : 0,
         items: items.map((i) => ({
           product_code: i.product_code,
           product_name: i.product_name,
@@ -624,7 +632,22 @@ function SalesPage() {
             <Separator className="my-4" />
 
             <div>
-              <p className="mb-2 text-sm font-medium">Төлбөрийн хэлбэр</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-medium">Төлбөрийн хэлбэр</p>
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="discount-switch"
+                    className="text-xs text-muted-foreground cursor-pointer select-none"
+                  >
+                    Хөнгөлөлт
+                  </label>
+                  <Switch
+                    id="discount-switch"
+                    checked={discountEnabled}
+                    onCheckedChange={setDiscountEnabled}
+                  />
+                </div>
+              </div>
               <p className="mb-3 text-xs text-muted-foreground">
                 Нийт дүнг төлбөрийн хэлбэрүүдээр хуваарилах
               </p>
@@ -659,6 +682,23 @@ function SalesPage() {
                         setDeferredAmount(Number(e.target.value))
                       }
                       className="w-28 rounded border px-2 py-1 text-right text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 tabular-nums"
+                    />
+                    <span className="text-xs text-muted-foreground">₮</span>
+                  </div>
+                </div>
+                <div className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${discountEnabled ? "border-green-200 bg-green-50" : "border-muted bg-muted/30"}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm ${discountEnabled ? "" : "text-muted-foreground"}`}>Хөнгөлөлт</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={discountAmount}
+                      disabled={!discountEnabled}
+                      onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                      className="w-28 rounded border px-2 py-1 text-right text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <span className="text-xs text-muted-foreground">₮</span>
                   </div>
@@ -713,12 +753,17 @@ function SalesPage() {
               </div>
               <div className="mt-3 flex justify-end border-t pt-3">
                 <div
-                  className={`text-sm font-semibold tabular-nums ${allocTotal < totalSum ? "text-destructive" : ""}`}
+                  className={`text-sm font-semibold tabular-nums ${allocTotal < totalSum - discountAmount ? "text-destructive" : ""}`}
                 >
                   Хуваарилалт: {allocTotal.toLocaleString("mn-MN")} ₮
-                  {allocTotal < totalSum && (
+                  {discountAmount > 0 && (
+                    <span className="ml-2 text-xs font-normal text-green-600">
+                      (хөнгөлөлт: {discountAmount.toLocaleString("mn-MN")} ₮)
+                    </span>
+                  )}
+                  {allocTotal < totalSum - discountAmount && (
                     <span className="ml-2 text-xs font-normal">
-                      ({(totalSum - allocTotal).toLocaleString("mn-MN")} ₮
+                      ({(totalSum - discountAmount - allocTotal).toLocaleString("mn-MN")} ₮
                       дутуу)
                     </span>
                   )}

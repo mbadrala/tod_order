@@ -91,6 +91,9 @@ function initializeDatabase(PDO $pdo): void
             slip_number TEXT,
             status TEXT NOT NULL DEFAULT 'final',
             total_amount REAL NOT NULL DEFAULT 0,
+            cash_amount REAL NOT NULL DEFAULT 0,
+            deferred_amount REAL NOT NULL DEFAULT 0,
+            discount_amount REAL NOT NULL DEFAULT 0,
             user_id INTEGER NOT NULL,
             created_at DATETIME DEFAULT (datetime('now')),
             updated_at DATETIME DEFAULT (datetime('now')),
@@ -127,6 +130,16 @@ function initializeDatabase(PDO $pdo): void
     }
     try {
         $pdo->exec("ALTER TABLE sales ADD COLUMN deferred_amount REAL NOT NULL DEFAULT 0");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+    try {
+        $pdo->exec("ALTER TABLE sales ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+    try {
+        $pdo->exec("ALTER TABLE reports ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0");
     } catch (\Exception $e) {
         // column already exists
     }
@@ -180,6 +193,7 @@ function initializeDatabase(PDO $pdo): void
             total_amount REAL NOT NULL DEFAULT 0,
             cash_amount REAL NOT NULL DEFAULT 0,
             deferred_amount REAL NOT NULL DEFAULT 0,
+            discount_amount REAL NOT NULL DEFAULT 0,
             product_code TEXT NOT NULL,
             product_name TEXT NOT NULL,
             item_amount REAL NOT NULL DEFAULT 1,

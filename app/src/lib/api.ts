@@ -145,6 +145,7 @@ export interface Sale {
   total_amount: number
   cash_amount: number
   deferred_amount: number
+  discount_amount: number
   user_id: number
   user_name?: string
   created_at: string
@@ -172,6 +173,7 @@ export interface SaleInput {
   status?: string
   cash_amount?: number
   deferred_amount?: number
+  discount_amount?: number
   items: Array<{
     product_code: string
     product_name: string
@@ -254,6 +256,7 @@ export interface Report {
   total_amount: number
   cash_amount: number
   deferred_amount: number
+  discount_amount: number
   product_code: string
   product_name: string
   item_amount: number

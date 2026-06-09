@@ -294,6 +294,7 @@ class SaleController
         $bankAllocations = $body['bank_allocations'] ?? [];
         $cashAmount = (float)($body['cash_amount'] ?? 0);
         $deferredAmount = (float)($body['deferred_amount'] ?? 0);
+        $discountAmount = (float)($body['discount_amount'] ?? 0);
 
         if ($slipNumber === '') {
             return $this->json($response, ['error' => 'slip number is required'], 400);
@@ -322,17 +323,17 @@ class SaleController
             unset($a);
         }
 
-        if ($status === 'final' && $allocTotal < $totalAmount) {
+        if ($status === 'final' && $allocTotal < $totalAmount - $discountAmount) {
             return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
         }
 
         $this->pdo->beginTransaction();
         try {
             $stmt = $this->pdo->prepare("
-                INSERT INTO sales (sale_date, client_code, client_name, client_phone, slip_number, status, total_amount, cash_amount, deferred_amount, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO sales (sale_date, client_code, client_name, client_phone, slip_number, status, total_amount, cash_amount, deferred_amount, discount_amount, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$saleDate, $clientCode, $clientName, $clientPhone, $slipNumber, $status, $totalAmount, $cashAmount, $deferredAmount, $userId]);
+            $stmt->execute([$saleDate, $clientCode, $clientName, $clientPhone, $slipNumber, $status, $totalAmount, $cashAmount, $deferredAmount, $discountAmount, $userId]);
             $saleId = $this->pdo->lastInsertId();
 
             $stmt = $this->pdo->prepare("
@@ -409,7 +410,7 @@ class SaleController
             return $this->json($response, ['error' => 'Та зөвхөн өөрийн үүсгэсэн борлуулалтыг засах боломжтой'], 403);
         }
 
-        $fields = ['sale_date', 'client_code', 'client_name', 'client_phone', 'slip_number', 'status', 'cash_amount', 'deferred_amount'];
+        $fields = ['sale_date', 'client_code', 'client_name', 'client_phone', 'slip_number', 'status', 'cash_amount', 'deferred_amount', 'discount_amount'];
         $set = [];
         $params = [];
 
@@ -440,6 +441,7 @@ class SaleController
             $status = $body['status'] ?? $sale['status'] ?? 'final';
             $cashAmount = (float)($body['cash_amount'] ?? $sale['cash_amount'] ?? 0);
             $deferredAmount = (float)($body['deferred_amount'] ?? $sale['deferred_amount'] ?? 0);
+            $discountAmount = (float)($body['discount_amount'] ?? $sale['discount_amount'] ?? 0);
 
             $allocTotal = $cashAmount + $deferredAmount;
             if (is_array($bankAllocations)) {
@@ -451,7 +453,7 @@ class SaleController
                 unset($a);
             }
 
-            if ($status === 'final' && $allocTotal < $totalAmount) {
+            if ($status === 'final' && $allocTotal < $totalAmount - $discountAmount) {
                 return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
             }
 
@@ -505,6 +507,7 @@ class SaleController
             if ($bankAllocations !== null && $status === 'final') {
                 $cashAmount = (float)($body['cash_amount'] ?? $sale['cash_amount'] ?? 0);
                 $deferredAmount = (float)($body['deferred_amount'] ?? $sale['deferred_amount'] ?? 0);
+                $discountAmount = (float)($body['discount_amount'] ?? $sale['discount_amount'] ?? 0);
                 $allocTotal = $cashAmount + $deferredAmount;
                 if (is_array($bankAllocations)) {
                     foreach ($bankAllocations as &$a) {
@@ -520,7 +523,7 @@ class SaleController
                 $existing = $stmt->fetch();
                 $existingTotal = (float)($existing['total_amount'] ?? 0);
 
-                if ($allocTotal < $existingTotal) {
+                if ($allocTotal < $existingTotal - $discountAmount) {
                     return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
                 }
 
@@ -618,8 +621,8 @@ class SaleController
         if ($u) $userName = $u['name'];
 
         $stmt = $this->pdo->prepare("
-            INSERT INTO reports (sale_id, sale_date, client_code, client_name, client_phone, slip_number, total_amount, cash_amount, deferred_amount, product_code, product_name, item_amount, unit_price, sum_price, user_id, user_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO reports (sale_id, sale_date, client_code, client_name, client_phone, slip_number, total_amount, cash_amount, deferred_amount, discount_amount, product_code, product_name, item_amount, unit_price, sum_price, user_id, user_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmtAlloc = $this->pdo->prepare("
             INSERT INTO report_bank_allocations (report_id, bank_account_id, bank_name, account_number, account_name, amount)
@@ -637,6 +640,7 @@ class SaleController
                 $sale['total_amount'],
                 $sale['cash_amount'],
                 $sale['deferred_amount'],
+                $sale['discount_amount'] ?? 0,
                 $item['product_code'],
                 $item['product_name'],
                 $item['amount'],
