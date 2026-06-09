@@ -250,7 +250,7 @@ function ReportsPage() {
   };
 
   const exportExcel = () => {
-    const sorted = [...flatRows].sort((a, b) => a.sale_id - b.sale_id);
+    const sorted = [...flatRows].sort((a, b) => b.sale_id - a.sale_id);
     const headers = [
       "Огноо",
       "Харилцагчийн код",
