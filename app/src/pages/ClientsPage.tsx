@@ -1,10 +1,9 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   flexRender,
+  getPaginationRowModel,
   type SortingState,
   type ColumnDef,
 } from "@tanstack/react-table";
@@ -37,6 +36,7 @@ import {
 } from "@/components/ui/pagination";
 import {
   getClients,
+  getClientsAll,
   createClient,
   updateClient,
   deleteClient,
@@ -46,9 +46,13 @@ import {
   type ClientInput,
 } from "@/lib/api";
 import * as XLSX from "xlsx";
+import { getPageNumbers } from "@/lib/utils";
 
 function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "created_at", desc: true },
   ]);
@@ -66,36 +70,31 @@ function ClientsPage() {
   const [searchName, setSearchName] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
   const isAdmin = JSON.parse(localStorage.getItem("user") || "{}").is_admin;
+  const perPage = 50;
 
-  const filteredClients = useMemo(() => {
-    const codeQ = searchCode.toLowerCase().trim();
-    const nameQ = searchName.toLowerCase().trim();
-    const phoneQ = searchPhone.toLowerCase().trim();
-    return clients.filter((c) => {
-      if (
-        codeQ &&
-        !(c.client_code && c.client_code.toLowerCase().includes(codeQ))
-      )
-        return false;
-      if (nameQ && !(c.name && c.name.toLowerCase().includes(nameQ)))
-        return false;
-      if (phoneQ && !(c.phone && c.phone.toLowerCase().includes(phoneQ)))
-        return false;
-      return true;
-    });
-  }, [clients, searchCode, searchName, searchPhone]);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const load = async () => {
+  const load = useCallback(async (p: number) => {
+    setLoading(true);
     try {
-      setClients(await getClients());
+      const res = await getClients({ code: searchCode, name: searchName, phone: searchPhone, page: p, per_page: perPage });
+      setClients(res.data);
+      setTotal(res.total);
+      setPage(res.page);
     } catch {
       /* ignore */
     }
-  };
+    setLoading(false);
+  }, [searchCode, searchName, searchPhone]);
 
   useEffect(() => {
-    load();
-  }, []);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      load(1);
+    }, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [searchCode, searchName, searchPhone, load]);
 
   const resetForm = () => {
     setForm({});
@@ -144,7 +143,7 @@ function ClientsPage() {
       }
       resetForm();
       setOpen(false);
-      await load();
+      await load(page);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Алдаа гарлаа");
     }
@@ -181,14 +180,15 @@ function ClientsPage() {
     try {
       await deleteClient(deleteTarget.id);
       setDeleteTarget(null);
-      await load();
+      await load(page);
     } catch (err) {
       setDeleteTarget(null);
       setError(err instanceof Error ? err.message : "Алдаа гарлаа");
     }
   };
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
+    const all = await getClientsAll({ code: searchCode, name: searchName, phone: searchPhone });
     const headers = [
       "Код",
       "Нэр",
@@ -201,7 +201,7 @@ function ClientsPage() {
       "Төлөв",
       "Бүртгэгдсэн",
     ];
-    const body = filteredClients.map((c) => [
+    const body = all.map((c) => [
       c.client_code || "",
       c.name,
       c.phone || "",
@@ -345,16 +345,22 @@ function ClientsPage() {
     },
   ];
 
+  const pageCount = Math.ceil(total / perPage);
+
   const table = useReactTable({
-    data: filteredClients,
+    data: clients,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 50 } },
+    initialState: { pagination: { pageSize: perPage, pageIndex: page - 1 } },
   });
+
+  const goPage = (p: number) => {
+    setPage(p);
+    load(p);
+  };
 
   return (
     <div className="mx-auto">
@@ -545,7 +551,16 @@ function ClientsPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="py-8 text-center text-muted-foreground"
+                >
+                  Уншиж байна...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -573,41 +588,43 @@ function ClientsPage() {
       </div>
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Нийт: {filteredClients.length} мөр</span>
+        <span>Нийт: {total} мөр</span>
         <span>
-          {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–
-          {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            filteredClients.length,
-          )}{" "}
-          / {filteredClients.length}
+          {(page - 1) * perPage + 1}–
+          {Math.min(page * perPage, total)} / {total}
         </span>
       </div>
 
-      {table.getPageCount() > 1 && (
+      {pageCount > 1 && (
         <Pagination className="mt-2">
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
-                onClick={() => table.previousPage()}
-                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                onClick={() => goPage(page - 1)}
+                className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
               />
             </PaginationItem>
-            {Array.from({ length: table.getPageCount() }, (_, i) => (
-              <PaginationItem key={i}>
-                <PaginationLink
-                  onClick={() => table.setPageIndex(i)}
-                  isActive={table.getState().pagination.pageIndex === i}
-                  className="cursor-pointer"
-                >
-                  {i + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
+            {getPageNumbers(page, pageCount).map((p, i) =>
+              p === "..." ? (
+                <PaginationItem key={`e${i}`}>
+                  <span className="px-2 text-muted-foreground">...</span>
+                </PaginationItem>
+              ) : (
+                <PaginationItem key={p}>
+                  <PaginationLink
+                    onClick={() => goPage(p)}
+                    isActive={page === p}
+                    className="cursor-pointer"
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              )
+            )}
             <PaginationItem>
               <PaginationNext
-                onClick={() => table.nextPage()}
-                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                onClick={() => goPage(page + 1)}
+                className={page >= pageCount ? "pointer-events-none opacity-50" : "cursor-pointer"}
               />
             </PaginationItem>
           </PaginationContent>

@@ -1,10 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   flexRender,
+  getPaginationRowModel,
   type SortingState,
   type ColumnDef,
 } from "@tanstack/react-table";
@@ -37,6 +36,7 @@ import {
 } from "@/components/ui/pagination";
 import {
   getProducts,
+  getProductsAll,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -44,9 +44,13 @@ import {
   type ProductInput,
 } from "@/lib/api";
 import * as XLSX from "xlsx";
+import { getPageNumbers } from "@/lib/utils";
 
 function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "code", desc: false },
   ]);
@@ -62,20 +66,36 @@ function ProductsPage() {
   const [searchName, setSearchName] = useState("");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = user.is_admin;
+  const perPage = 50;
 
-  const filteredProducts = useMemo(() => {
-    const codeQ = searchCode.toLowerCase().trim();
-    const nameQ = searchName.toLowerCase().trim();
-    return products.filter((p) => {
-      if (codeQ && !p.code.toLowerCase().includes(codeQ)) return false;
-      if (nameQ && !p.name.toLowerCase().includes(nameQ)) return false;
-      return true;
-    });
-  }, [products, searchCode, searchName]);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const exportExcel = () => {
+  const load = useCallback(async (p: number) => {
+    setLoading(true);
+    try {
+      const res = await getProducts({ code: searchCode, name: searchName, page: p, per_page: perPage });
+      setProducts(res.data);
+      setTotal(res.total);
+      setPage(res.page);
+    } catch {
+      /* ignore */
+    }
+    setLoading(false);
+  }, [searchCode, searchName]);
+
+  useEffect(() => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      load(1);
+    }, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [searchCode, searchName, load]);
+
+  const exportExcel = async () => {
+    const all = await getProductsAll({ code: searchCode, name: searchName });
     const headers = ["Код", "Нэр", "Бүртгэгдсэн"];
-    const body = filteredProducts.map((p) => [
+    const body = all.map((p) => [
       p.code,
       p.name,
       p.created_at?.slice(0, 10) || "",
@@ -88,18 +108,6 @@ function ProductsPage() {
       `products_export_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
   };
-
-  const load = async () => {
-    try {
-      setProducts(await getProducts());
-    } catch {
-      /* ignore */
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   const resetForm = () => {
     setForm({ code: "", name: "" });
@@ -139,7 +147,7 @@ function ProductsPage() {
       }
       resetForm();
       setOpen(false);
-      await load();
+      await load(page);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Алдаа гарлаа");
     }
@@ -154,7 +162,7 @@ function ProductsPage() {
     try {
       await deleteProduct(deleteTarget.id);
       setDeleteTarget(null);
-      await load();
+      await load(page);
     } catch (err) {
       setDeleteTarget(null);
       setError(err instanceof Error ? err.message : "Алдаа гарлаа");
@@ -209,16 +217,22 @@ function ProductsPage() {
       : []),
   ];
 
+  const pageCount = Math.ceil(total / perPage);
+
   const table = useReactTable({
-    data: filteredProducts,
+    data: products,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 50 } },
+    initialState: { pagination: { pageSize: perPage, pageIndex: page - 1 } },
   });
+
+  const goPage = (p: number) => {
+    setPage(p);
+    load(p);
+  };
 
   return (
     <div className="mx-auto">
@@ -331,7 +345,16 @@ function ProductsPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="py-8 text-center text-muted-foreground"
+                >
+                  Уншиж байна...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -359,41 +382,43 @@ function ProductsPage() {
       </div>
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Нийт: {filteredProducts.length} мөр</span>
+        <span>Нийт: {total} мөр</span>
         <span>
-          {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–
-          {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            filteredProducts.length,
-          )}{" "}
-          / {filteredProducts.length}
+          {(page - 1) * perPage + 1}–
+          {Math.min(page * perPage, total)} / {total}
         </span>
       </div>
 
-      {table.getPageCount() > 1 && (
+      {pageCount > 1 && (
         <Pagination className="mt-2">
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
-                onClick={() => table.previousPage()}
-                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                onClick={() => goPage(page - 1)}
+                className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
               />
             </PaginationItem>
-            {Array.from({ length: table.getPageCount() }, (_, i) => (
-              <PaginationItem key={i}>
-                <PaginationLink
-                  onClick={() => table.setPageIndex(i)}
-                  isActive={table.getState().pagination.pageIndex === i}
-                  className="cursor-pointer"
-                >
-                  {i + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
+            {getPageNumbers(page, pageCount).map((p, i) =>
+              p === "..." ? (
+                <PaginationItem key={`e${i}`}>
+                  <span className="px-2 text-muted-foreground">...</span>
+                </PaginationItem>
+              ) : (
+                <PaginationItem key={p}>
+                  <PaginationLink
+                    onClick={() => goPage(p)}
+                    isActive={page === p}
+                    className="cursor-pointer"
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              )
+            )}
             <PaginationItem>
               <PaginationNext
-                onClick={() => table.nextPage()}
-                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                onClick={() => goPage(page + 1)}
+                className={page >= pageCount ? "pointer-events-none opacity-50" : "cursor-pointer"}
               />
             </PaginationItem>
           </PaginationContent>

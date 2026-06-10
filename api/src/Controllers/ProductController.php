@@ -16,7 +16,64 @@ class ProductController
 
     public function list(Request $request, Response $response): Response
     {
-        $stmt = $this->pdo->query("SELECT * FROM products ORDER BY name");
+        $params = $request->getQueryParams();
+        $code = trim($params['code'] ?? '');
+        $name = trim($params['name'] ?? '');
+        $page = max(1, (int)($params['page'] ?? 1));
+        $perPage = max(1, min(200, (int)($params['per_page'] ?? 50)));
+
+        $conditions = [];
+        $binds = [];
+        if ($code !== '') {
+            $conditions[] = "code LIKE ?";
+            $binds[] = "%$code%";
+        }
+        if ($name !== '') {
+            $conditions[] = "name LIKE ?";
+            $binds[] = "%$name%";
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM products $where");
+        $countStmt->execute($binds);
+        $total = (int)$countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $perPage;
+        $dataStmt = $this->pdo->prepare("SELECT * FROM products $where ORDER BY name LIMIT ? OFFSET ?");
+        $execBinds = $binds;
+        $execBinds[] = $perPage;
+        $execBinds[] = $offset;
+        $dataStmt->execute($execBinds);
+
+        return $this->json($response, [
+            'data' => $dataStmt->fetchAll(),
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+    }
+
+    public function listAll(Request $request, Response $response): Response
+    {
+        $params = $request->getQueryParams();
+        $code = trim($params['code'] ?? '');
+        $name = trim($params['name'] ?? '');
+
+        $conditions = [];
+        $binds = [];
+        if ($code !== '') {
+            $conditions[] = "code LIKE ?";
+            $binds[] = "%$code%";
+        }
+        if ($name !== '') {
+            $conditions[] = "name LIKE ?";
+            $binds[] = "%$name%";
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+        $stmt = $this->pdo->prepare("SELECT * FROM products $where ORDER BY name");
+        $stmt->execute($binds);
         return $this->json($response, $stmt->fetchAll());
     }
 

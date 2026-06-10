@@ -1,10 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   flexRender,
+  getPaginationRowModel,
   type SortingState,
   type ColumnDef,
 } from "@tanstack/react-table";
@@ -38,13 +37,15 @@ import {
 } from "@/components/ui/pagination";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ClientSelect } from "@/components/ui/client-select";
+import { getPageNumbers } from "@/lib/utils";
 import {
   getSales,
+  getSale,
   createSale,
   updateSale,
   deleteSale,
-  getProducts,
-  getClients,
+  getProductsAll,
+  getClientsAll,
   getBankAccounts,
   type Sale,
   type Product,
@@ -76,15 +77,20 @@ const emptyLine = (): LineItemForm => ({
 
 function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([
     { id: "sale_date", desc: true },
   ]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  // dialog form state
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [saleDate, setSaleDate] = useState<Date>(new Date());
+  const [saleDate, setSaleDate] = useState(new Date());
   const [clientCode, setClientCode] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -105,53 +111,55 @@ function SalesPage() {
   const [searchTotalMin, setSearchTotalMin] = useState("");
   const [searchTotalMax, setSearchTotalMax] = useState("");
   const isAdmin = JSON.parse(localStorage.getItem("user") || "{}").is_admin;
+  const perPage = 50;
 
-  const filteredSales = useMemo(() => {
-    const nameQ = searchClientName.toLowerCase().trim();
-    const slipQ = searchSlipNumber.toLowerCase().trim();
-    const min = searchTotalMin === "" ? -Infinity : Number(searchTotalMin);
-    const max = searchTotalMax === "" ? Infinity : Number(searchTotalMax);
-    return sales.filter((s) => {
-      if (
-        nameQ &&
-        !(s.client_name && s.client_name.toLowerCase().includes(nameQ))
-      )
-        return false;
-      if (
-        slipQ &&
-        !(s.slip_number && s.slip_number.toLowerCase().includes(slipQ))
-      )
-        return false;
-      if (s.total_amount < min || s.total_amount > max) return false;
-      return true;
-    });
-  }, [
-    sales,
-    searchClientName,
-    searchSlipNumber,
-    searchTotalMin,
-    searchTotalMax,
-  ]);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const load = async () => {
+  const load = useCallback(async (p: number) => {
+    setLoading(true);
     try {
-      const [s, p, c, b] = await Promise.all([
-        getSales(),
-        getProducts(),
-        getClients(),
-        getBankAccounts(),
-      ]);
-      setSales(s);
-      setProducts(p);
-      setClients(c);
-      setBankAccounts(b);
+      const res = await getSales({
+        client_name: searchClientName,
+        slip_number: searchSlipNumber,
+        total_min: searchTotalMin || undefined,
+        total_max: searchTotalMax || undefined,
+        page: p,
+        per_page: perPage,
+      });
+      setSales(res.data);
+      setTotal(res.total);
+      setPage(res.page);
     } catch {
       /* ignore */
     }
-  };
+    setLoading(false);
+  }, [searchClientName, searchSlipNumber, searchTotalMin, searchTotalMax]);
 
   useEffect(() => {
-    load();
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      load(1);
+    }, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [searchClientName, searchSlipNumber, searchTotalMin, searchTotalMax, load]);
+
+  // Load reference data once on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const [p, c, b] = await Promise.all([
+          getProductsAll(),
+          getClientsAll(),
+          getBankAccounts(),
+        ]);
+        setProducts(p);
+        setClients(c);
+        setBankAccounts(b);
+      } catch {
+        /* ignore */
+      }
+    })();
   }, []);
 
   const resetForm = () => {
@@ -170,36 +178,41 @@ function SalesPage() {
     setError("");
   };
 
-  const openEdit = (s: Sale) => {
-    setSaleDate(new Date(s.sale_date));
-    setClientCode(s.client_code || "");
-    setClientName(s.client_name || "");
-    setClientPhone(s.client_phone || "");
-    setSlipNumber(s.slip_number || "");
-    setCashAmount(s.cash_amount);
-    setDeferredAmount(s.deferred_amount);
-    setDiscountAmount(s.discount_amount ?? 0);
-    setDiscountEnabled((s.discount_amount ?? 0) > 0);
-    setItems(
-      s.items.map((i) => ({
-        product_code: i.product_code,
-        product_name: i.product_name,
-        amount: i.amount,
-        unit_price: i.unit_price,
-      })),
-    );
-    setAllocations(
-      (s.bank_allocations || []).map((a) => ({
-        bank_account_id: a.bank_account_id,
-        bank_name: a.bank_name,
-        account_number: a.account_number,
-        account_name: a.account_name,
-        amount: a.amount,
-      })),
-    );
-    setEditId(s.id);
-    setError("");
-    setOpen(true);
+  const openEdit = async (s: Sale) => {
+    try {
+      const full = await getSale(s.id);
+      setSaleDate(new Date(full.sale_date));
+      setClientCode(full.client_code || "");
+      setClientName(full.client_name || "");
+      setClientPhone(full.client_phone || "");
+      setSlipNumber(full.slip_number || "");
+      setCashAmount(full.cash_amount);
+      setDeferredAmount(full.deferred_amount);
+      setDiscountAmount(full.discount_amount ?? 0);
+      setDiscountEnabled((full.discount_amount ?? 0) > 0);
+      setItems(
+        full.items.map((i) => ({
+          product_code: i.product_code,
+          product_name: i.product_name,
+          amount: i.amount,
+          unit_price: i.unit_price,
+        })),
+      );
+      setAllocations(
+        (full.bank_allocations || []).map((a) => ({
+          bank_account_id: a.bank_account_id,
+          bank_name: a.bank_name,
+          account_number: a.account_number,
+          account_name: a.account_name,
+          amount: a.amount,
+        })),
+      );
+      setEditId(s.id);
+      setError("");
+      setOpen(true);
+    } catch {
+      setError("Борлуулалт уншихад алдаа гарлаа");
+    }
   };
 
   const openCreate = () => {
@@ -312,7 +325,7 @@ function SalesPage() {
       }
       resetForm();
       setOpen(false);
-      await load();
+      await load(page);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Алдаа гарлаа");
     }
@@ -327,7 +340,7 @@ function SalesPage() {
     try {
       await deleteSale(deleteTarget.id);
       setDeleteTarget(null);
-      await load();
+      await load(page);
     } catch (err) {
       setDeleteTarget(null);
       setError(err instanceof Error ? err.message : "Алдаа гарлаа");
@@ -397,7 +410,7 @@ function SalesPage() {
     {
       id: "items_count",
       header: "Мөр",
-      cell: ({ row }) => row.original.items?.length ?? "-",
+      cell: ({ row }) => row.original.items_count ?? (row.original.items?.length ?? "-"),
     },
     {
       id: "user_name",
@@ -432,16 +445,22 @@ function SalesPage() {
     },
   ];
 
+  const pageCount = Math.ceil(total / perPage);
+
   const table = useReactTable({
-    data: filteredSales,
+    data: sales,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 50 } },
+    initialState: { pagination: { pageSize: perPage, pageIndex: page - 1 } },
   });
+
+  const goPage = (p: number) => {
+    setPage(p);
+    load(p);
+  };
 
   return (
     <div className="mx-auto">
@@ -830,7 +849,16 @@ function SalesPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="py-8 text-center text-muted-foreground"
+                >
+                  Уншиж байна...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -858,41 +886,43 @@ function SalesPage() {
       </div>
 
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Нийт: {filteredSales.length} мөр</span>
+        <span>Нийт: {total} мөр</span>
         <span>
-          {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–
-          {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            filteredSales.length,
-          )}{" "}
-          / {filteredSales.length}
+          {(page - 1) * perPage + 1}–
+          {Math.min(page * perPage, total)} / {total}
         </span>
       </div>
 
-      {table.getPageCount() > 1 && (
+      {pageCount > 1 && (
         <Pagination className="mt-2">
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
-                onClick={() => table.previousPage()}
-                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                onClick={() => goPage(page - 1)}
+                className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
               />
             </PaginationItem>
-            {Array.from({ length: table.getPageCount() }, (_, i) => (
-              <PaginationItem key={i}>
-                <PaginationLink
-                  onClick={() => table.setPageIndex(i)}
-                  isActive={table.getState().pagination.pageIndex === i}
-                  className="cursor-pointer"
-                >
-                  {i + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
+            {getPageNumbers(page, pageCount).map((p, i) =>
+              p === "..." ? (
+                <PaginationItem key={`e${i}`}>
+                  <span className="px-2 text-muted-foreground">...</span>
+                </PaginationItem>
+              ) : (
+                <PaginationItem key={p}>
+                  <PaginationLink
+                    onClick={() => goPage(p)}
+                    isActive={page === p}
+                    className="cursor-pointer"
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              )
+            )}
             <PaginationItem>
               <PaginationNext
-                onClick={() => table.nextPage()}
-                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                onClick={() => goPage(page + 1)}
+                className={page >= pageCount ? "pointer-events-none opacity-50" : "cursor-pointer"}
               />
             </PaginationItem>
           </PaginationContent>

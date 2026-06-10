@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/pagination";
 import {
   listReports,
+  listReportsAll,
   deleteReport,
   getBankAccounts,
-  getClients,
+  getClientsAll,
   getUsers,
   type BankAccount,
   type Client,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/api";
 import * as XLSX from "xlsx";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { getPageNumbers } from "@/lib/utils";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
@@ -90,6 +92,8 @@ function ReportsPage() {
   const [bankAccountId, setBankAccountId] = useState("");
   const [filterUserId, setFilterUserId] = useState("");
   const [data, setData] = useState<Report[]>([]);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [users, setUsers] = useState<Array<{ id: number; name: string }>>([]);
@@ -101,7 +105,7 @@ function ReportsPage() {
 
   const loadMeta = async () => {
     try {
-      const [c, b] = await Promise.all([getClients(), getBankAccounts()]);
+      const [c, b] = await Promise.all([getClientsAll(), getBankAccounts()]);
       setClients(c);
       setBankAccounts(b);
       if (isAdmin()) {
@@ -117,10 +121,12 @@ function ReportsPage() {
     loadMeta();
   }, []);
 
-  const fetchReport = useCallback(async () => {
+  const perPage = 100;
+
+  const fetchReport = useCallback(async (page: number = 1) => {
     setLoading(true);
     try {
-      const filters: Record<string, any> = {};
+      const filters: Record<string, any> = { page, per_page: perPage };
       if (fromDate) filters.from = fromDate.toISOString().slice(0, 10);
       if (toDate) filters.to = toDate.toISOString().slice(0, 10);
       if (clientCode.trim()) filters.client_code = clientCode.trim();
@@ -136,9 +142,12 @@ function ReportsPage() {
       if (filterUserId) filters.user_id = Number(filterUserId);
 
       const result = await listReports(filters);
-      setData(result);
+      setData(result.data);
+      setTotal(result.total);
+      setCurrentPage(result.page);
     } catch {
       setData([]);
+      setTotal(0);
     }
     setLoading(false);
   }, [
@@ -158,7 +167,7 @@ function ReportsPage() {
   ]);
 
   useEffect(() => {
-    fetchReport();
+    fetchReport(1);
   }, [fetchReport]);
 
   const handleClientSelect = (c: {
@@ -180,7 +189,7 @@ function ReportsPage() {
     try {
       await deleteReport(deleteTarget.sale_id);
       setDeleteTarget(null);
-      await fetchReport();
+      await fetchReport(currentPage);
     } catch {
       setDeleteTarget(null);
     }
@@ -216,31 +225,22 @@ function ReportsPage() {
     return rows;
   }, [data]);
 
-  const PAGE_SIZE = 100;
-  const [pageIndex, setPageIndex] = useState(0);
-
-  useEffect(() => {
-    if (pageIndex > 0 && pageIndex >= Math.ceil(flatRows.length / PAGE_SIZE)) {
-      setPageIndex(0);
-    }
-  }, [flatRows.length, pageIndex]);
-
-  const pageRows = useMemo(
-    () => flatRows.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE),
-    [flatRows, pageIndex],
-  );
-
   const pageSpanMap = useMemo(() => {
     const map = new Map<number, { count: number; seen: boolean }>();
-    for (const r of pageRows) {
+    for (const r of flatRows) {
       const entry = map.get(r.sale_id) || { count: 0, seen: false };
       entry.count++;
       map.set(r.sale_id, entry);
     }
     return map;
-  }, [pageRows]);
+  }, [flatRows]);
 
-  const pageCount = Math.ceil(flatRows.length / PAGE_SIZE);
+  const pageCount = Math.ceil(total / perPage);
+
+  const goPage = (p: number) => {
+    setCurrentPage(p);
+    fetchReport(p);
+  };
 
   const exportName = useMemo(
     () =>
@@ -273,8 +273,48 @@ function ReportsPage() {
     window.open(url, "_blank");
   };
 
-  const exportExcel = () => {
-    const sorted = [...flatRows].sort((a, b) => b.sale_id - a.sale_id);
+  const exportExcel = async () => {
+    const filters: Record<string, any> = {};
+    if (fromDate) filters.from = fromDate.toISOString().slice(0, 10);
+    if (toDate) filters.to = toDate.toISOString().slice(0, 10);
+    if (clientCode.trim()) filters.client_code = clientCode.trim();
+    if (productCode.trim()) filters.product_code = productCode.trim();
+    if (productName.trim()) filters.product_name = productName.trim();
+    if (amountMin) filters.amount_min = Number(amountMin);
+    if (amountMax) filters.amount_max = Number(amountMax);
+    if (unitPriceMin) filters.unit_price_min = Number(unitPriceMin);
+    if (unitPriceMax) filters.unit_price_max = Number(unitPriceMax);
+    if (sumPriceMin) filters.sum_price_min = Number(sumPriceMin);
+    if (sumPriceMax) filters.sum_price_max = Number(sumPriceMax);
+    if (bankAccountId) filters.bank_account_id = Number(bankAccountId);
+    if (filterUserId) filters.user_id = Number(filterUserId);
+    const allData = await listReportsAll(filters);
+    const allRows: FlatRow[] = allData.map((r) => {
+      const bankByAccountId: Record<string, number> = {};
+      for (const a of r.bank_allocations || []) {
+        bankByAccountId[String(a.bank_account_id)] = a.amount;
+      }
+      return {
+        sale_id: r.sale_id,
+        sale_date: r.sale_date,
+        client_code: r.client_code || "",
+        client_name: r.client_name || "",
+        client_phone: r.client_phone || "",
+        slip_number: r.slip_number || "",
+        product_code: r.product_code,
+        product_name: r.product_name,
+        amount: r.item_amount,
+        unit_price: r.unit_price,
+        sum_price: r.sum_price,
+        cash_amount: r.cash_amount,
+        deferred_amount: r.deferred_amount,
+        discount_amount: r.discount_amount ?? 0,
+        user_name: r.user_name,
+        created_at: r.created_at,
+        bankAllocs: { ...bankByAccountId },
+      };
+    });
+    const sorted = allRows.sort((a, b) => b.sale_id - a.sale_id);
     const headers = [
       "Огноо",
       "Харилцагчийн код",
@@ -548,7 +588,7 @@ function ReportsPage() {
             </select>
           </div>
         )}
-        <Button variant="default" onClick={fetchReport}>
+        <Button variant="default" onClick={() => fetchReport(1)}>
           Хайх
         </Button>
       </div>
@@ -630,7 +670,7 @@ function ReportsPage() {
             <tbody>
               {(() => {
                 const seenSaleIds = new Set<number>();
-                return pageRows.map((r) => {
+                return flatRows.map((r) => {
                   const isFirst = !seenSaleIds.has(r.sale_id);
                   if (isFirst) seenSaleIds.add(r.sale_id);
                   const span = isFirst
@@ -763,18 +803,11 @@ function ReportsPage() {
               })()}
             </tbody>
           </table>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Нийт мөр: {flatRows.length}
-          </p>
-          <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-            <span />
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Нийт мөр: {total}</span>
             <span>
-              {pageIndex * PAGE_SIZE + 1}–
-              {Math.min(
-                (pageIndex + 1) * PAGE_SIZE,
-                flatRows.length,
-              )}{" "}
-              / {flatRows.length}
+              {(currentPage - 1) * perPage + 1}–
+              {Math.min(currentPage * perPage, total)} / {total}
             </span>
           </div>
 
@@ -783,25 +816,31 @@ function ReportsPage() {
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
-                    onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-                    className={pageIndex === 0 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={() => goPage(currentPage - 1)}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
-                {Array.from({ length: pageCount }, (_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink
-                      onClick={() => setPageIndex(i)}
-                      isActive={pageIndex === i}
-                      className="cursor-pointer"
-                    >
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
+                {getPageNumbers(currentPage, pageCount).map((p, i) =>
+                  p === "..." ? (
+                    <PaginationItem key={`e${i}`}>
+                      <span className="px-2 text-muted-foreground">...</span>
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        onClick={() => goPage(p)}
+                        isActive={currentPage === p}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
                 <PaginationItem>
                   <PaginationNext
-                    onClick={() => setPageIndex((p) => Math.min(pageCount - 1, p + 1))}
-                    className={pageIndex === pageCount - 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    onClick={() => goPage(currentPage + 1)}
+                    className={currentPage >= pageCount ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
               </PaginationContent>

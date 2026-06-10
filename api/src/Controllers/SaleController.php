@@ -225,37 +225,70 @@ class SaleController
 
     public function list(Request $request, Response $response): Response
     {
-        $stmt = $this->pdo->query("SELECT s.*, u.name AS user_name FROM sales s LEFT JOIN users u ON s.user_id = u.id ORDER BY s.sale_date DESC, s.id DESC");
-        $sales = $stmt->fetchAll();
+        $params = $request->getQueryParams();
+        $clientName = trim($params['client_name'] ?? '');
+        $slipNumber = trim($params['slip_number'] ?? '');
+        $totalMin = $params['total_min'] ?? '';
+        $totalMax = $params['total_max'] ?? '';
+        $page = max(1, (int)($params['page'] ?? 1));
+        $perPage = max(1, min(200, (int)($params['per_page'] ?? 50)));
 
-        if (!empty($sales)) {
-            $ids = array_column($sales, 'id');
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $conditions = [];
+        $binds = [];
 
-            $stmt = $this->pdo->prepare("SELECT * FROM sale_items WHERE sale_id IN ($placeholders) ORDER BY id");
-            $stmt->execute($ids);
-            $allItems = $stmt->fetchAll();
-            $itemsBySale = [];
-            foreach ($allItems as $item) {
-                $itemsBySale[$item['sale_id']][] = $item;
-            }
-
-            $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id IN ($placeholders) ORDER BY id");
-            $stmt->execute($ids);
-            $allAllocs = $stmt->fetchAll();
-            $allocsBySale = [];
-            foreach ($allAllocs as $a) {
-                $allocsBySale[$a['sale_id']][] = $a;
-            }
-
-            foreach ($sales as &$sale) {
-                $sale['items'] = $itemsBySale[$sale['id']] ?? [];
-                $sale['bank_allocations'] = $allocsBySale[$sale['id']] ?? [];
-            }
-            unset($sale);
+        if ($clientName !== '') {
+            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $binds[] = "%$clientName%";
+            $binds[] = "%$clientName%";
+        }
+        if ($slipNumber !== '') {
+            $conditions[] = "s.slip_number LIKE ?";
+            $binds[] = "%$slipNumber%";
+        }
+        if ($totalMin !== '') {
+            $conditions[] = "s.total_amount >= ?";
+            $binds[] = (float)$totalMin;
+        }
+        if ($totalMax !== '') {
+            $conditions[] = "s.total_amount <= ?";
+            $binds[] = (float)$totalMax;
         }
 
-        return $this->json($response, $sales);
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM sales s $where");
+        $countStmt->execute($binds);
+        $total = (int)$countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $perPage;
+        $sql = "SELECT s.*, u.name AS user_name, COUNT(si.id) AS items_count
+                FROM sales s
+                LEFT JOIN users u ON s.user_id = u.id
+                LEFT JOIN sale_items si ON si.sale_id = s.id
+                $where
+                GROUP BY s.id
+                ORDER BY s.sale_date DESC, s.id DESC
+                LIMIT ? OFFSET ?";
+        $execBinds = $binds;
+        $execBinds[] = $perPage;
+        $execBinds[] = $offset;
+        $dataStmt = $this->pdo->prepare($sql);
+        $dataStmt->execute($execBinds);
+        $sales = $dataStmt->fetchAll();
+
+        // Attach empty items and bank_allocations for type consistency
+        foreach ($sales as &$sale) {
+            $sale['items'] = [];
+            $sale['bank_allocations'] = [];
+        }
+        unset($sale);
+
+        return $this->json($response, [
+            'data' => $sales,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
     }
 
     public function get(Request $request, Response $response, array $args): Response

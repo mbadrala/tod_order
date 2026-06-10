@@ -64,8 +64,37 @@ export interface Client {
 
 export type ClientInput = Partial<Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
 
-export async function getClients() {
-  return request<Client[]>('/clients')
+export interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  per_page: number
+}
+
+export interface ClientFilters {
+  code?: string
+  name?: string
+  phone?: string
+  page?: number
+  per_page?: number
+}
+
+export async function getClients(filters: ClientFilters = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<PaginatedResponse<Client>>(`/clients${qs ? '?' + qs : ''}`)
+}
+
+export async function getClientsAll(filters: Omit<ClientFilters, 'page' | 'per_page'> = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<Client[]>(`/clients/all${qs ? '?' + qs : ''}`)
 }
 
 export async function createClient(data: ClientInput) {
@@ -104,8 +133,29 @@ export interface Product {
 
 export type ProductInput = { code: string; name: string }
 
-export async function getProducts() {
-  return request<Product[]>('/products')
+export interface ProductFilters {
+  code?: string
+  name?: string
+  page?: number
+  per_page?: number
+}
+
+export async function getProducts(filters: ProductFilters = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<PaginatedResponse<Product>>(`/products${qs ? '?' + qs : ''}`)
+}
+
+export async function getProductsAll(filters: Omit<ProductFilters, 'page' | 'per_page'> = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<Product[]>(`/products/all${qs ? '?' + qs : ''}`)
 }
 
 export async function getProduct(id: number) {
@@ -152,6 +202,7 @@ export interface Sale {
   updated_at: string
   items: SaleItem[]
   bank_allocations: SaleBankAllocation[]
+  items_count?: number
 }
 
 export interface SaleItem {
@@ -188,8 +239,22 @@ export interface SaleInput {
   }>
 }
 
-export async function getSales() {
-  return request<Sale[]>('/sales')
+export interface SaleFilters {
+  client_name?: string
+  slip_number?: string
+  total_min?: string
+  total_max?: string
+  page?: number
+  per_page?: number
+}
+
+export async function getSales(filters: SaleFilters = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<PaginatedResponse<Sale>>(`/sales${qs ? '?' + qs : ''}`)
 }
 
 export async function getSale(id: number) {
@@ -282,6 +347,8 @@ export interface ReportFilters {
   sum_price_max?: number
   bank_account_id?: number
   user_id?: number
+  page?: number
+  per_page?: number
 }
 
 export async function listReports(filters: ReportFilters = {}) {
@@ -290,7 +357,16 @@ export async function listReports(filters: ReportFilters = {}) {
     if (v !== undefined && v !== '') params.set(k, String(v))
   }
   const qs = params.toString()
-  return request<Report[]>(`/reports${qs ? '?' + qs : ''}`)
+  return request<PaginatedResponse<Report>>(`/reports${qs ? '?' + qs : ''}`)
+}
+
+export async function listReportsAll(filters: Omit<ReportFilters, 'page' | 'per_page'> = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<Report[]>(`/reports/all${qs ? '?' + qs : ''}`)
 }
 
 export async function deleteReport(saleId: number) {

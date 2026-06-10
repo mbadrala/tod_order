@@ -49,6 +49,19 @@ $app->add(function (Request $request, $handler) {
 $app->addBodyParsingMiddleware();
 $app->addErrorMiddleware(true, true, true);
 
+// Request logging middleware
+$app->add(function (Request $request, $handler) {
+    $start = microtime(true);
+    $response = $handler->handle($request);
+    $duration = round((microtime(true) - $start) * 1000);
+    $status = $response->getStatusCode();
+    $method = $request->getMethod();
+    $path = $request->getUri()->getPath();
+    $qs = $request->getUri()->getQuery();
+    error_log("$method $path" . ($qs ? "?$qs" : "") . " → $status ({$duration}ms)");
+    return $response;
+});
+
 $authController = new AuthController($pdo, $config['jwt_secret']);
 
 $app->post('/auth/login', [$authController, 'login']);
@@ -63,6 +76,7 @@ $app->group('/auth', function (RouteCollectorProxy $group) use ($authController)
 $clientController = new ClientController($pdo);
 
 $app->group('/clients', function (RouteCollectorProxy $group) use ($clientController) {
+    $group->get('/all', [$clientController, 'listAll']);
     $group->get('', [$clientController, 'list']);
     $group->post('', [$clientController, 'create']);
     $group->get('/{id}', [$clientController, 'get']);
@@ -73,6 +87,7 @@ $app->group('/clients', function (RouteCollectorProxy $group) use ($clientContro
 $productController = new ProductController($pdo);
 
 $app->group('/products', function (RouteCollectorProxy $group) use ($productController) {
+    $group->get('/all', [$productController, 'listAll']);
     $group->get('', [$productController, 'list']);
     $group->get('/{id}', [$productController, 'get']);
     $group->post('', [$productController, 'create']);
@@ -113,6 +128,7 @@ $app->group('/bank-accounts', function (RouteCollectorProxy $group) use ($bankAc
 $reportController = new ReportController($pdo);
 
 $app->group('/reports', function (RouteCollectorProxy $group) use ($reportController) {
+    $group->get('/all', [$reportController, 'listAll']);
     $group->get('', [$reportController, 'list']);
     $group->delete('/{sale_id}', [$reportController, 'delete']);
 })->add(new AuthMiddleware($config['jwt_secret']));
