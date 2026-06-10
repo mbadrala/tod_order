@@ -27,11 +27,17 @@ seedAdmin($pdo);
 
 $app = AppFactory::create();
 
-$app->add(function (Request $request, $handler) {
+$allowedOrigins = $config['cors_allowed_origins'];
+
+$app->add(function (Request $request, $handler) use ($allowedOrigins) {
     if ($request->getMethod() === 'OPTIONS') {
+        $origin = $request->getHeaderLine('Origin');
+        $allowOrigin = in_array($origin, $allowedOrigins, true) ? $origin : '';
         $response = new SlimResponse();
+        if ($allowOrigin) {
+            $response = $response->withHeader('Access-Control-Allow-Origin', $allowOrigin);
+        }
         return $response
-            ->withHeader('Access-Control-Allow-Origin', '*')
             ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
             ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
             ->withStatus(204);
@@ -39,11 +45,14 @@ $app->add(function (Request $request, $handler) {
     return $handler->handle($request);
 });
 
-$app->add(function (Request $request, $handler) {
+$app->add(function (Request $request, $handler) use ($allowedOrigins) {
+    $origin = $request->getHeaderLine('Origin');
+    $allowOrigin = in_array($origin, $allowedOrigins, true) ? $origin : '';
     $response = $handler->handle($request);
-    return $response
-        ->withHeader('Access-Control-Allow-Origin', '*')
-        ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if ($allowOrigin) {
+        $response = $response->withHeader('Access-Control-Allow-Origin', $allowOrigin);
+    }
+    return $response->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 });
 
 $app->addBodyParsingMiddleware();
