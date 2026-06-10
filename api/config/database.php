@@ -217,6 +217,13 @@ function initializeDatabase(PDO $pdo): void
             FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE
         )
     ");
+
+    // Indexes for query performance on larger datasets
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_reports_sale_date_id ON reports(sale_date DESC, id DESC)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_reports_sale_id ON reports(sale_id)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sales_sale_date_id ON sales(sale_date DESC, id DESC)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sales_user_id ON sales(user_id)");
 }
 
 function seedAdmin(PDO $pdo): void
