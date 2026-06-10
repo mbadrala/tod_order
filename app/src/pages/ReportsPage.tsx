@@ -4,6 +4,14 @@ import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ClientSelect } from "@/components/ui/client-select";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationLink,
+} from "@/components/ui/pagination";
+import {
   listReports,
   deleteReport,
   getBankAccounts,
@@ -208,15 +216,31 @@ function ReportsPage() {
     return rows;
   }, [data]);
 
-  const saleSpanMap = useMemo(() => {
+  const PAGE_SIZE = 100;
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    if (pageIndex > 0 && pageIndex >= Math.ceil(flatRows.length / PAGE_SIZE)) {
+      setPageIndex(0);
+    }
+  }, [flatRows.length, pageIndex]);
+
+  const pageRows = useMemo(
+    () => flatRows.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE),
+    [flatRows, pageIndex],
+  );
+
+  const pageSpanMap = useMemo(() => {
     const map = new Map<number, { count: number; seen: boolean }>();
-    for (const r of flatRows) {
+    for (const r of pageRows) {
       const entry = map.get(r.sale_id) || { count: 0, seen: false };
       entry.count++;
       map.set(r.sale_id, entry);
     }
     return map;
-  }, [flatRows]);
+  }, [pageRows]);
+
+  const pageCount = Math.ceil(flatRows.length / PAGE_SIZE);
 
   const exportName = useMemo(
     () =>
@@ -606,11 +630,11 @@ function ReportsPage() {
             <tbody>
               {(() => {
                 const seenSaleIds = new Set<number>();
-                return flatRows.map((r) => {
+                return pageRows.map((r) => {
                   const isFirst = !seenSaleIds.has(r.sale_id);
                   if (isFirst) seenSaleIds.add(r.sale_id);
                   const span = isFirst
-                    ? (saleSpanMap.get(r.sale_id)?.count ?? 1)
+                    ? (pageSpanMap.get(r.sale_id)?.count ?? 1)
                     : 0;
                   return (
                     <tr
@@ -654,7 +678,7 @@ function ReportsPage() {
                       <td className="whitespace-nowrap px-2 py-1.5">
                         {r.product_code}
                       </td>
-                      <td className="truncate max-w-[100px] px-2 py-1.5">
+                      <td className="truncate max-w-[200px] px-2 py-1.5">
                         {r.product_name}
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">
@@ -742,6 +766,47 @@ function ReportsPage() {
           <p className="mt-2 text-xs text-muted-foreground">
             Нийт мөр: {flatRows.length}
           </p>
+          <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+            <span />
+            <span>
+              {pageIndex * PAGE_SIZE + 1}–
+              {Math.min(
+                (pageIndex + 1) * PAGE_SIZE,
+                flatRows.length,
+              )}{" "}
+              / {flatRows.length}
+            </span>
+          </div>
+
+          {pageCount > 1 && (
+            <Pagination className="mt-2">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                    className={pageIndex === 0 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                {Array.from({ length: pageCount }, (_, i) => (
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      onClick={() => setPageIndex(i)}
+                      isActive={pageIndex === i}
+                      className="cursor-pointer"
+                    >
+                      {i + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPageIndex((p) => Math.min(pageCount - 1, p + 1))}
+                    className={pageIndex === pageCount - 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </div>
       )}
 

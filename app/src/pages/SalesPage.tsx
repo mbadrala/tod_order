@@ -3,6 +3,7 @@ import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
+  getPaginationRowModel,
   flexRender,
   type SortingState,
   type ColumnDef,
@@ -27,6 +28,14 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationLink,
+} from "@/components/ui/pagination";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ClientSelect } from "@/components/ui/client-select";
 import {
@@ -430,6 +439,8 @@ function SalesPage() {
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 50 } },
   });
 
   return (
@@ -845,6 +856,48 @@ function SalesPage() {
           </TableBody>
         </Table>
       </div>
+
+      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+        <span>Нийт: {filteredSales.length} мөр</span>
+        <span>
+          {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}–
+          {Math.min(
+            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+            filteredSales.length,
+          )}{" "}
+          / {filteredSales.length}
+        </span>
+      </div>
+
+      {table.getPageCount() > 1 && (
+        <Pagination className="mt-2">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => table.previousPage()}
+                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+            {Array.from({ length: table.getPageCount() }, (_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  onClick={() => table.setPageIndex(i)}
+                  isActive={table.getState().pagination.pageIndex === i}
+                  className="cursor-pointer"
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => table.nextPage()}
+                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}
