@@ -477,7 +477,7 @@ function SalesPage() {
       >
         <DialogPortal>
           <DialogBackdrop />
-          <DialogPopup className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+          <DialogPopup className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
             <DialogTitle>
               {editId ? "Борлуулалт засах" : "Шинэ борлуулалт"}
             </DialogTitle>

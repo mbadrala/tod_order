@@ -548,7 +548,7 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
                   Харилцагчийн код
                 </th>
-                <th className="whitespace-nowrap px-2 py-2 font-medium">
+                <th className="px-2 py-2 font-medium">
                   Харилцагчийн нэр
                 </th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
@@ -560,7 +560,7 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
                   Барааны код
                 </th>
-                <th className="whitespace-nowrap px-2 py-2 font-medium">
+                <th className="px-2 py-2 font-medium">
                   Барааны нэр
                 </th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">
@@ -590,7 +590,7 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">
                   Хөнгөлөлт
                 </th>
-                <th className="whitespace-nowrap px-2 py-2 font-medium">
+                <th className="px-2 py-2 font-medium">
                   Бүртгэсэн ажилтан
                 </th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
@@ -632,7 +632,7 @@ function ReportsPage() {
                             {r.client_code}
                           </td>
                           <td
-                            className="whitespace-nowrap px-2 py-1.5"
+                            className="truncate max-w-[100px] px-2 py-1.5"
                             rowSpan={span}
                           >
                             {r.client_name}
@@ -654,7 +654,7 @@ function ReportsPage() {
                       <td className="whitespace-nowrap px-2 py-1.5">
                         {r.product_code}
                       </td>
-                      <td className="whitespace-nowrap px-2 py-1.5">
+                      <td className="truncate max-w-[100px] px-2 py-1.5">
                         {r.product_name}
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">
@@ -700,7 +700,7 @@ function ReportsPage() {
                               : "-"}
                           </td>
                           <td
-                            className="whitespace-nowrap px-2 py-1.5"
+                            className="truncate max-w-[100px] px-2 py-1.5"
                             rowSpan={span}
                           >
                             {r.user_name}

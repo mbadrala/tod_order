@@ -33,7 +33,7 @@ export function ClientSelect({ clients, selectedCode, selectedName, selectedPhon
         </Button>
       } />
       <PopoverPortal>
-        <PopoverPositioner align="start" className="min-w-72">
+          <PopoverPositioner align="start" className="min-w-60">
           <PopoverPopup className="p-0">
             <Command>
               <CommandInput placeholder={placeholder} />

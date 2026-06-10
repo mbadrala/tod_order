@@ -55,11 +55,13 @@ function ClientsPage() {
   } | null>(null);
   const [searchCode, setSearchCode] = useState("");
   const [searchName, setSearchName] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
   const isAdmin = JSON.parse(localStorage.getItem("user") || "{}").is_admin;
 
   const filteredClients = useMemo(() => {
     const codeQ = searchCode.toLowerCase().trim();
     const nameQ = searchName.toLowerCase().trim();
+    const phoneQ = searchPhone.toLowerCase().trim();
     return clients.filter((c) => {
       if (
         codeQ &&
@@ -68,9 +70,11 @@ function ClientsPage() {
         return false;
       if (nameQ && !(c.name && c.name.toLowerCase().includes(nameQ)))
         return false;
+      if (phoneQ && !(c.phone && c.phone.toLowerCase().includes(phoneQ)))
+        return false;
       return true;
     });
-  }, [clients, searchCode, searchName]);
+  }, [clients, searchCode, searchName, searchPhone]);
 
   const load = async () => {
     try {
@@ -364,6 +368,12 @@ function ClientsPage() {
           placeholder="Нэрээр хайх..."
           value={searchName}
           onChange={(e) => setSearchName(e.target.value)}
+          className="min-w-48 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
+        />
+        <input
+          placeholder="Утасаар хайх..."
+          value={searchPhone}
+          onChange={(e) => setSearchPhone(e.target.value)}
           className="min-w-48 flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50"
         />
       </div>
