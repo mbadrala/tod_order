@@ -59,7 +59,9 @@ $app->addBodyParsingMiddleware();
 $app->addErrorMiddleware(true, true, true);
 
 // Request logging middleware
-$app->add(function (Request $request, $handler) {
+$logDir = dirname($config['upload_dir']) . '/logs';
+if (!is_dir($logDir)) mkdir($logDir, 0755, true);
+$app->add(function (Request $request, $handler) use ($logDir) {
     $start = microtime(true);
     $response = $handler->handle($request);
     $duration = round((microtime(true) - $start) * 1000);
@@ -67,7 +69,34 @@ $app->add(function (Request $request, $handler) {
     $method = $request->getMethod();
     $path = $request->getUri()->getPath();
     $qs = $request->getUri()->getQuery();
-    error_log("$method $path" . ($qs ? "?$qs" : "") . " → $status ({$duration}ms)");
+    $user = '-';
+    $authHeader = $request->getHeaderLine('Authorization');
+    if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+        $parts = explode('.', $m[1]);
+        if (count($parts) === 3) {
+            $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);
+            if ($payload && isset($payload['username'])) {
+                $user = $payload['username'];
+            }
+        }
+    }
+    $logFile = "$logDir/app-" . date('Y-m-d') . '.log';
+    $entry = json_encode([
+        'ts' => date('Y-m-d H:i:s'),
+        'user' => $user,
+        'method' => $method,
+        'path' => $path,
+        'query' => $qs,
+        'status' => $status,
+        'ms' => $duration,
+    ], JSON_UNESCAPED_UNICODE);
+    file_put_contents($logFile, $entry . PHP_EOL, FILE_APPEND | LOCK_EX);
+    foreach (glob("$logDir/app-*.log") ?: [] as $f) {
+        $basename = basename($f);
+        if (preg_match('/^app-(\d{4}-\d{2}-\d{2})\.log$/', $basename, $m)) {
+            if (strtotime($m[1]) < strtotime('-7 days')) unlink($f);
+        }
+    }
     return $response;
 });
 
@@ -141,5 +170,10 @@ $app->group('/reports', function (RouteCollectorProxy $group) use ($reportContro
     $group->get('', [$reportController, 'list']);
     $group->delete('/{sale_id}', [$reportController, 'delete']);
 })->add(new AuthMiddleware($config['jwt_secret']));
+
+// Include this before $app->run()
+use App\Controllers\LogController;
+$logController = new LogController($logDir);
+$app->get('/logs', [$logController, 'list'])->add(new AuthMiddleware($config['jwt_secret']));
 
 $app->run();

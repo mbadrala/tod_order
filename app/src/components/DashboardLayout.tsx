@@ -14,6 +14,7 @@ function navItems(isAdmin: boolean) {
   if (isAdmin) {
     items.push({ label: "Банкны данс", path: "/bank-accounts" })
     items.push({ label: "Хэрэглэгчид", path: "/users" })
+    items.push({ label: "Системийн лог", path: "/logs" })
   }
   return items
 }

@@ -151,7 +151,7 @@ class AuthController
             return $this->json($response, ['error' => 'invalid credentials'], 401);
         }
 
-        $token = $this->generateToken($user['id'], (bool)$user['is_admin']);
+        $token = $this->generateToken($user['id'], (bool)$user['is_admin'], $user['username']);
 
         return $this->json($response, [
             'token' => $token,
@@ -164,11 +164,12 @@ class AuthController
         ]);
     }
 
-    private function generateToken(int $userId, bool $isAdmin): string
+    private function generateToken(int $userId, bool $isAdmin, string $username): string
     {
         $payload = [
             'user_id' => $userId,
             'is_admin' => $isAdmin,
+            'username' => $username,
             'iat' => time(),
             'exp' => time() + 86400 * 7,
         ];

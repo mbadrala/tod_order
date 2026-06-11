@@ -373,6 +373,20 @@ export async function deleteReport(saleId: number) {
   return request<{ message: string }>(`/reports/${saleId}`, { method: 'DELETE' })
 }
 
+export interface LogEntry {
+  timestamp: string
+  username: string
+  method: string
+  path: string
+  query: string
+  status: number
+  duration_ms: number
+}
+
+export async function getLogs() {
+  return request<{ data: LogEntry[]; total: number }>('/logs')
+}
+
 export function getFileUrl(id: number | string | null | undefined): string | null {
   if (!id) return null
   const token = localStorage.getItem('token')
