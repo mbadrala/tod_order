@@ -111,6 +111,7 @@ function SalesPage() {
   const [searchTotalMin, setSearchTotalMin] = useState("");
   const [searchTotalMax, setSearchTotalMax] = useState("");
   const isAdmin = JSON.parse(localStorage.getItem("user") || "{}").is_admin;
+  const currentUserId = JSON.parse(localStorage.getItem("user") || "{}").id;
   const perPage = 50;
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -423,13 +424,15 @@ function SalesPage() {
       header: "Үйлдэл",
       cell: ({ row }) => (
         <div className="flex gap-1">
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => openEdit(row.original)}
-          >
-            Засах
-          </Button>
+          {(isAdmin || row.original.user_id === currentUserId) && (
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => openEdit(row.original)}
+            >
+              Засах
+            </Button>
+          )}
           {isAdmin && (
             <Button
               variant="outline"

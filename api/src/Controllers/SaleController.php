@@ -276,10 +276,18 @@ class SaleController
         $dataStmt->execute($execBinds);
         $sales = $dataStmt->fetchAll();
 
-        // Attach empty items and bank_allocations for type consistency
+        $isAdmin = $request->getAttribute('is_admin');
+        $userId = (int)$request->getAttribute('user_id');
+
         foreach ($sales as &$sale) {
             $sale['items'] = [];
             $sale['bank_allocations'] = [];
+            if (!$isAdmin && (int)$sale['user_id'] !== $userId) {
+                $sale['total_amount'] = 0;
+                $sale['cash_amount'] = 0;
+                $sale['deferred_amount'] = 0;
+                $sale['discount_amount'] = 0;
+            }
         }
         unset($sale);
 
@@ -308,6 +316,15 @@ class SaleController
         $stmt = $this->pdo->prepare("SELECT * FROM sale_bank_allocations WHERE sale_id = ? ORDER BY id");
         $stmt->execute([$args['id']]);
         $sale['bank_allocations'] = $stmt->fetchAll();
+
+        $isAdmin = $request->getAttribute('is_admin');
+        $userId = (int)$request->getAttribute('user_id');
+        if (!$isAdmin && (int)$sale['user_id'] !== $userId) {
+            $sale['total_amount'] = 0;
+            $sale['cash_amount'] = 0;
+            $sale['deferred_amount'] = 0;
+            $sale['discount_amount'] = 0;
+        }
 
         return $this->json($response, $sale);
     }
