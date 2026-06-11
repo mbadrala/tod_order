@@ -16,6 +16,7 @@ storage/uploads/*
 
 # Server Logs & Cache
 core/var/
+storage/logs/
 *.log
 
 # OS Generated Files
