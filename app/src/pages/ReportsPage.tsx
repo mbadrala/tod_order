@@ -681,7 +681,7 @@ function ReportsPage() {
                     : 0;
                   return (
                     <tr
-                      key={`${r.sale_id}-${r.product_code}-${Math.random()}`}
+                      key={`${r.sale_id}-${r.product_code}`}
                       className="border-t"
                     >
                       {isFirst ? (

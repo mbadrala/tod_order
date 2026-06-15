@@ -36,7 +36,11 @@ function DashboardLayout() {
     getMe().then((data) => {
       localStorage.setItem("user", JSON.stringify(data));
       setUser(data);
-    }).catch(() => {});
+    }).catch(() => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/login");
+    });
   }, []);
 
   const handleLogout = () => {

@@ -145,7 +145,7 @@ function SalesSummaryPage() {
           <tbody>
             {data.length === 0 ? (
               <tr>
-                <td colSpan={7 + bankAccounts.length} className="h-24 text-center text-muted-foreground">
+                <td colSpan={10 + bankAccounts.length} className="h-24 text-center text-muted-foreground">
                   Борлуулалт олдсонгүй
                 </td>
               </tr>

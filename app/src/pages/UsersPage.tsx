@@ -61,6 +61,7 @@ function UsersPage() {
     setPassword("");
     setPermissions([]);
     setEditId(null);
+    setEditingIsAdmin(false);
     setError("");
   };
 

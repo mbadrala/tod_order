@@ -41,17 +41,17 @@ class AuthMiddleware implements MiddlewareInterface
                 ->withAttribute('is_admin', $decoded->is_admin ?? false);
 
             // Fetch permissions fresh from DB so changes take effect immediately
-            $permissions = [];
+            $permissions = ["sales","reports","clients","products"];
             if ($this->pdo) {
                 $stmt = $this->pdo->prepare("SELECT permissions FROM users WHERE id = ?");
                 $stmt->execute([$decoded->user_id]);
                 $user = $stmt->fetch();
-                if ($user && $user['permissions']) {
+                if (!$user) {
+                    return $this->unauthorized('User not found');
+                }
+                if ($user['permissions'] !== null) {
                     $permissions = json_decode($user['permissions'], true) ?? [];
                 }
-            }
-            if (empty($permissions)) {
-                $permissions = ["sales","reports","clients","products"];
             }
             $request = $request->withAttribute('permissions', $permissions);
         } catch (\Exception $e) {
