@@ -122,6 +122,13 @@ function initializeDatabase(PDO $pdo): void
         // column already exists
     }
 
+    // migration: add is_locked column
+    try {
+        $pdo->exec("ALTER TABLE sales ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
     // migration: add cash_amount and deferred_amount columns
     try {
         $pdo->exec("ALTER TABLE sales ADD COLUMN cash_amount REAL NOT NULL DEFAULT 0");

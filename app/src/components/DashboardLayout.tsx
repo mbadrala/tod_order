@@ -5,18 +5,21 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 
 function navItems(isAdmin: boolean) {
-  const items = [
+  const common = [
     { label: "Борлуулалт", path: "/" },
     { label: "Тайлан", path: "/reports" },
     { label: "Харилцагчид", path: "/clients" },
     { label: "Бараа", path: "/products" },
   ]
-  if (isAdmin) {
-    items.push({ label: "Банкны данс", path: "/bank-accounts" })
-    items.push({ label: "Хэрэглэгчид", path: "/users" })
-    items.push({ label: "Системийн лог", path: "/logs" })
-  }
-  return items
+  const admin = isAdmin
+    ? [
+        { label: "Нэгтгэл", path: "/sales-summary" },
+        { label: "Банкны данс", path: "/bank-accounts" },
+        { label: "Хэрэглэгчид", path: "/users" },
+        { label: "Системийн лог", path: "/logs" },
+      ]
+    : []
+  return { common, admin }
 }
 
 function DashboardLayout() {
@@ -50,20 +53,45 @@ function DashboardLayout() {
         <Separator />
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems(user.is_admin).map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={closeSidebar}
-              className={`flex rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                location.pathname === item.path
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-muted'
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {(() => { const { common, admin } = navItems(user.is_admin); return (
+            <>
+              {common.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={closeSidebar}
+                  className={`flex rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    location.pathname === item.path
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+              {admin.length > 0 && (
+                <>
+                  <div className="pt-4 pb-1 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Админ удирдлага
+                  </div>
+                  {admin.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={closeSidebar}
+                      className={`flex rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        location.pathname === item.path
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-muted'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </>
+              )}
+            </>
+          )})()}
         </nav>
 
         <Separator />

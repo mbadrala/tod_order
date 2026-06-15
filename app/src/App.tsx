@@ -9,6 +9,7 @@ import ProductsPage from './pages/ProductsPage'
 import SalesPage from './pages/SalesPage'
 import BankAccountsPage from './pages/BankAccountsPage'
 import ReportsPage from './pages/ReportsPage'
+import SalesSummaryPage from './pages/SalesSummaryPage'
 import LogsPage from './pages/LogsPage'
 
 function App() {
@@ -42,6 +43,14 @@ function App() {
           }
         />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route
+          path="/sales-summary"
+          element={
+            <AdminRoute>
+              <SalesSummaryPage />
+            </AdminRoute>
+          }
+        />
         <Route
           path="/logs"
           element={

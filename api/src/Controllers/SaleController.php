@@ -299,6 +299,102 @@ class SaleController
         ]);
     }
 
+    public function listSummary(Request $request, Response $response): Response
+    {
+        if (!$request->getAttribute('is_admin')) {
+            return $this->json($response, ['error' => 'admin only'], 403);
+        }
+
+        $params = $request->getQueryParams();
+        $clientName = trim($params['client_name'] ?? '');
+        $slipNumber = trim($params['slip_number'] ?? '');
+        $totalMin = $params['total_min'] ?? '';
+        $totalMax = $params['total_max'] ?? '';
+        $from = $params['from'] ?? '';
+        $to = $params['to'] ?? '';
+        $page = max(1, (int)($params['page'] ?? 1));
+        $perPage = max(1, min(200, (int)($params['per_page'] ?? 100)));
+
+        $conditions = [];
+        $binds = [];
+
+        if ($clientName !== '') {
+            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $binds[] = "%$clientName%";
+            $binds[] = "%$clientName%";
+        }
+        if ($slipNumber !== '') {
+            $conditions[] = "s.slip_number LIKE ?";
+            $binds[] = "%$slipNumber%";
+        }
+        if ($totalMin !== '') {
+            $conditions[] = "s.total_amount >= ?";
+            $binds[] = (float)$totalMin;
+        }
+        if ($totalMax !== '') {
+            $conditions[] = "s.total_amount <= ?";
+            $binds[] = (float)$totalMax;
+        }
+        if ($from !== '') {
+            $conditions[] = "s.sale_date >= ?";
+            $binds[] = $from;
+        }
+        if ($to !== '') {
+            $conditions[] = "s.sale_date <= ?";
+            $binds[] = $to;
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM sales s $where");
+        $countStmt->execute($binds);
+        $total = (int)$countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $perPage;
+        $sql = "SELECT s.*, u.name AS user_name,
+                       (SELECT COALESCE(SUM(amount), 0) FROM sale_bank_allocations WHERE sale_id = s.id) AS bank_total
+                FROM sales s
+                LEFT JOIN users u ON s.user_id = u.id
+                $where
+                ORDER BY s.sale_date DESC, s.id DESC
+                LIMIT ? OFFSET ?";
+        $execBinds = $binds;
+        $execBinds[] = $perPage;
+        $execBinds[] = $offset;
+        $dataStmt = $this->pdo->prepare($sql);
+        $dataStmt->execute($execBinds);
+        $sales = $dataStmt->fetchAll();
+
+        // Attach per-bank allocation breakdown
+        if (!empty($sales)) {
+            $saleIds = array_column($sales, 'id');
+            $placeholders = implode(',', array_fill(0, count($saleIds), '?'));
+            $stmt = $this->pdo->prepare(
+                "SELECT sale_id, bank_account_id, COALESCE(SUM(amount), 0) AS total
+                 FROM sale_bank_allocations
+                 WHERE sale_id IN ($placeholders)
+                 GROUP BY sale_id, bank_account_id"
+            );
+            $stmt->execute($saleIds);
+            $allocs = $stmt->fetchAll();
+            $allocLookup = [];
+            foreach ($allocs as $a) {
+                $allocLookup[$a['sale_id']][$a['bank_account_id']] = (float)$a['total'];
+            }
+            foreach ($sales as &$sale) {
+                $sale['bank_allocations'] = $allocLookup[$sale['id']] ?? [];
+            }
+            unset($sale);
+        }
+
+        return $this->json($response, [
+            'data' => $sales,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+    }
+
     public function get(Request $request, Response $response, array $args): Response
     {
         $stmt = $this->pdo->prepare("SELECT * FROM sales WHERE id = ?");
@@ -420,6 +516,7 @@ class SaleController
 
             if ($status === 'final') {
                 $this->generateReportRows($saleId);
+                $this->pdo->prepare("UPDATE sales SET is_locked = 1 WHERE id = ?")->execute([$saleId]);
             }
 
             $this->pdo->commit();
@@ -447,7 +544,7 @@ class SaleController
     {
         $body = $request->getParsedBody();
 
-        $stmt = $this->pdo->prepare("SELECT id, user_id FROM sales WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT id, user_id, is_locked FROM sales WHERE id = ?");
         $stmt->execute([$args['id']]);
         $sale = $stmt->fetch();
         if (!$sale) {
@@ -458,6 +555,10 @@ class SaleController
         $userId = $request->getAttribute('user_id');
         if (!$isAdmin && (int)$sale['user_id'] !== (int)$userId) {
             return $this->json($response, ['error' => 'Та зөвхөн өөрийн үүсгэсэн борлуулалтыг засах боломжтой'], 403);
+        }
+
+        if (!$isAdmin && (int)($sale['is_locked'] ?? 0) === 1) {
+            return $this->json($response, ['error' => 'Энэ борлуулалт түгжигдсэн тул засах боломжгүй. Админаас түгжээг тайлуулна уу'], 403);
         }
 
         $fields = ['sale_date', 'client_code', 'client_name', 'client_phone', 'slip_number', 'status', 'cash_amount', 'deferred_amount', 'discount_amount'];
@@ -613,6 +714,7 @@ class SaleController
         $finalStatus = $body['status'] ?? $sale['status'] ?? 'final';
         if ($finalStatus === 'final') {
             $this->generateReportRows($args['id']);
+            $this->pdo->prepare("UPDATE sales SET is_locked = 1, updated_at = ? WHERE id = ?")->execute([date('Y-m-d H:i:s'), $args['id']]);
         }
 
         $stmt = $this->pdo->prepare("SELECT * FROM sales WHERE id = ?");
@@ -648,6 +750,26 @@ class SaleController
         $this->pdo->prepare("DELETE FROM sales WHERE id = ?")->execute([$args['id']]);
 
         return $this->json($response, ['message' => 'deleted']);
+    }
+
+    public function toggleLock(Request $request, Response $response, array $args): Response
+    {
+        if (!$request->getAttribute('is_admin')) {
+            return $this->json($response, ['error' => 'admin only'], 403);
+        }
+
+        $stmt = $this->pdo->prepare("SELECT id, is_locked FROM sales WHERE id = ?");
+        $stmt->execute([$args['id']]);
+        $sale = $stmt->fetch();
+        if (!$sale) {
+            return $this->json($response, ['error' => 'not found'], 404);
+        }
+
+        $newLocked = $sale['is_locked'] ? 0 : 1;
+        $this->pdo->prepare("UPDATE sales SET is_locked = ?, updated_at = ? WHERE id = ?")
+            ->execute([$newLocked, date('Y-m-d H:i:s'), $args['id']]);
+
+        return $this->json($response, ['is_locked' => $newLocked]);
     }
 
     private function generateReportRows(int $saleId): void

@@ -203,6 +203,7 @@ export interface Sale {
   items: SaleItem[]
   bank_allocations: SaleBankAllocation[]
   items_count?: number
+  is_locked?: number
 }
 
 export interface SaleItem {
@@ -385,6 +386,51 @@ export interface LogEntry {
 
 export async function getLogs() {
   return request<{ data: LogEntry[]; total: number }>('/logs')
+}
+
+export interface SaleSummaryFilters {
+  page?: number
+  per_page?: number
+  client_name?: string
+  slip_number?: string
+  total_min?: string
+  total_max?: string
+  from?: string
+  to?: string
+}
+
+export interface SaleSummary {
+  id: number
+  sale_date: string
+  client_code: string | null
+  client_name: string | null
+  client_phone: string | null
+  slip_number: string | null
+  status: string
+  total_amount: number
+  cash_amount: number
+  deferred_amount: number
+  discount_amount: number
+  bank_total: number
+  bank_allocations: Record<string, number>
+  is_locked: number
+  user_id: number
+  user_name?: string
+  created_at: string
+  updated_at: string
+}
+
+export async function getSalesSummary(filters: SaleSummaryFilters = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<{ data: SaleSummary[]; total: number; page: number; per_page: number }>(`/sales/admin-summary${qs ? `?${qs}` : ''}`)
+}
+
+export async function toggleSaleLock(id: number): Promise<{ is_locked: number }> {
+  return request(`/sales/${id}/lock`, { method: 'POST' })
 }
 
 export function getFileUrl(id: number | string | null | undefined): string | null {

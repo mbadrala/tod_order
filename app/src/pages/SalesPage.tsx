@@ -425,13 +425,17 @@ function SalesPage() {
       cell: ({ row }) => (
         <div className="flex gap-1">
           {(isAdmin || row.original.user_id === currentUserId) && (
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => openEdit(row.original)}
-            >
-              Засах
-            </Button>
+            row.original.is_locked && !isAdmin ? (
+              <span className="text-xs text-muted-foreground px-2">Түгжигдсэн</span>
+            ) : (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => openEdit(row.original)}
+              >
+                Засах
+              </Button>
+            )
           )}
           {isAdmin && (
             <Button

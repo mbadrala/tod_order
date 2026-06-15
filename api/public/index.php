@@ -144,6 +144,7 @@ $app->group('/files', function (RouteCollectorProxy $group) use ($fileController
 $saleController = new SaleController($pdo);
 
 $app->group('/sales', function (RouteCollectorProxy $group) use ($saleController) {
+    $group->get('/admin-summary', [$saleController, 'listSummary']);
     $group->get('', [$saleController, 'list']);
     $group->post('', [$saleController, 'create']);
     $group->get('/report', [$saleController, 'report']);
@@ -151,6 +152,7 @@ $app->group('/sales', function (RouteCollectorProxy $group) use ($saleController
     $group->get('/{id}', [$saleController, 'get']);
     $group->put('/{id}', [$saleController, 'update']);
     $group->delete('/{id}', [$saleController, 'delete']);
+    $group->post('/{id}/lock', [$saleController, 'toggleLock']);
 })->add(new AuthMiddleware($config['jwt_secret']));
 
 $bankAccountController = new BankAccountController($pdo);

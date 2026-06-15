@@ -114,10 +114,25 @@ php seed.php
      - **`uploads/`** фолдер
      - **`logs/`** фолдер
 
-   Дараа нь зөвшөөрөл тохируулах:
-   - `storage/` фолдер дээр баруун товч → **Change Permissions**
-   - **755** (Write: Owner, Read+Execute: Owner/Group/Public) — энэ нь SQLite-д бичихэд хангалттай ихэнх тохиолдолд
-   - **777** (хэрэв 755 ажиллахгүй бол — SQLite бичихэд 777 шаардлагатай байж болно)
+   Дараа нь зөвшөөрөл тохируулах — **хамгийн чухал алхам:** cPanel дээр PHP нь таны хэрэглэгчээр ажилладаг бол Apache вэб сервер нь өөр хэрэглэгчээр ажилладаг. Файлуудыг зөвхөн эзэмшигчид хязгаарласнаар Apache тэдгээрийг serve хийх боломжгүй болно.
+
+   File Manager дээр файл/фолдер бүр дээр баруун товч → **Change Permissions:**
+
+   | Файл/Фолдер | Зөвшөөрөл | Тайлбар |
+   |---|---|---|
+   | `storage/` | **700** | Apache орж чадахгүй, PHP ажиллана |
+   | `storage/database.sqlite` | **600** | Зөвхөн эзэмшигч унших/бичих |
+   | `storage/uploads/` | **700** | Apache хандахгүй |
+   | `storage/logs/` | **700** | Apache хандахгүй |
+   | `.env` | **600** | Зөвхөн эзэмшигч унших |
+   | `composer.json` | **600** | Apache serve хийхгүй |
+   | `composer.lock` | **600** | Apache serve хийхгүй |
+   | `seed.php` | **600** | Зөвхөн CLI-ээр ажиллуулна |
+   | `router.php` | **600** | Зөвхөн dev серверт хэрэгтэй |
+
+   `public/index.php` нь `644` байх ёстой (бүгд унших).
+
+   **Жич:** Хэрэв `storage/`-д `700` өгсөн бол доторх бүх файл/фолдер автоматаар хамгаалагдана. `storage/database.sqlite`-д `600`, `storage/uploads/`-д `700` өгөх шаардлагатай.
 
 4. **.env файл үүсгэх:**
 
@@ -142,12 +157,26 @@ php seed.php
 
    ```htaccess
    RewriteEngine On
+
+   # Block sensitive files and directories
+   RewriteRule ^\.env - [F,L]
+   RewriteRule ^composer\.(json|lock)$ - [F,L]
+   RewriteRule ^seed\.php$ - [F,L]
+   RewriteRule ^router\.php$ - [F,L]
+   RewriteRule ^\.git/ - [F,L]
+   RewriteRule ^src/ - [F,L]
+   RewriteRule ^vendor/ - [F,L]
+   RewriteRule ^storage/ - [F,L]
+
+   # Route everything else through Slim
    RewriteCond %{REQUEST_FILENAME} !-f
    RewriteCond %{REQUEST_FILENAME} !-d
    RewriteRule ^ public/index.php [QSA,L]
    ```
 
    **Хэрэв subdomain биш, `order.todsocks.mn/api/` дотор байрлаж байвал** (жишээ нь main domain-ын доорх folder) `public/index.php`-д SCRIPT_NAME-ийг тохируулах шаардлагатай.
+
+   **Чухал:** `.htaccess` нь Apache тохиргооноос хамааралтай (зарим хостинг дээр `AllowOverride` унтарсан байдаг). **Файлын зөвшөөрөл (600/700) нь 100% найдвартай** — энэ нь cPanel-ийн түвшинд ажилладаг тул дээрх алхам 3-т заасан permissions-ийг заавал тохируулах.
 
 ### Frontend байршуулах
 
