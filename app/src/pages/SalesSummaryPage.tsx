@@ -126,12 +126,15 @@ function SalesSummaryPage() {
               <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Дүн</th>
               <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Бэлэн</th>
               {bankAccounts.map((ba) => (
-                <th
-                  key={ba.id}
-                  className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap"
-                  title={`${ba.bank_name} - ${ba.account_number}`}
-                >
-                  {ba.account_name || ba.bank_name}
+                  <th
+                    key={ba.id}
+                    className="h-10 px-2 text-center align-middle font-medium whitespace-nowrap"
+                    title={`${ba.bank_name} - ${ba.account_number}`}
+                  >
+                  <div className="flex flex-col items-center">
+                    <span>{ba.bank_name}</span>
+                    {ba.account_name && <span className="text-muted-foreground">({ba.account_name})</span>}
+                  </div>
                 </th>
               ))}
               <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Дараа төлбөр</th>

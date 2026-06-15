@@ -642,10 +642,13 @@ function ReportsPage() {
                 {bankAccounts.map((ba) => (
                   <th
                     key={ba.id}
-                    className="whitespace-nowrap px-2 py-2 font-medium text-right"
+                    className="whitespace-nowrap px-2 py-2 font-medium text-center"
                     title={`${ba.bank_name} - ${ba.account_number}`}
                   >
-                    {ba.account_name || ba.bank_name}
+                    <div className="flex flex-col items-center">
+                      <span>{ba.bank_name}</span>
+                      {ba.account_name && <span className="text-muted-foreground">({ba.account_name})</span>}
+                    </div>
                   </th>
                 ))}
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">
