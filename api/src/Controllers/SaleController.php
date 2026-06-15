@@ -136,7 +136,7 @@ class SaleController
 
         $bankCols = '';
         foreach ($bankAccounts as $ba) {
-            $label = !empty($ba['account_name']) ? $ba['account_name'] : ($ba['bank_name'] ?? '');
+            $label = ($ba['bank_name'] ?? '') . (!empty($ba['account_name']) ? ' (' . $ba['account_name'] . ')' : '');
             $bankCols .= '<th style="padding:3px 4px;border:1px solid ' . $bdr . ';text-align:right;font-weight:bold;white-space:nowrap;font-size:8px;">' . htmlspecialchars($label) . '</th>';
         }
 

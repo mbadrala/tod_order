@@ -328,7 +328,7 @@ function ReportsPage() {
       "Дүн",
       "Бэлэн",
       ...bankAccounts.map(
-        (ba, i) => ba.account_name || ba.bank_name || `Данс ${i + 1}`,
+        (ba) => ba.account_name ? `${ba.bank_name} (${ba.account_name})` : ba.bank_name,
       ),
       "Дараа төлбөр",
       "Хөнгөлөлт",
