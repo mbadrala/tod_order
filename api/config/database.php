@@ -129,6 +129,13 @@ function initializeDatabase(PDO $pdo): void
         // column already exists
     }
 
+    // migration: add permissions column
+    try {
+        $pdo->exec("ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT '[\"sales\",\"reports\",\"clients\",\"products\"]'");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
     // migration: add cash_amount and deferred_amount columns
     try {
         $pdo->exec("ALTER TABLE sales ADD COLUMN cash_amount REAL NOT NULL DEFAULT 0");

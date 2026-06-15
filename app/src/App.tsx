@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import UsersPage from './pages/UsersPage'
 import ClientsPage from './pages/ClientsPage'
 import ProductsPage from './pages/ProductsPage'
+import RequirePermission from './components/RequirePermission'
 import SalesPage from './pages/SalesPage'
 import BankAccountsPage from './pages/BankAccountsPage'
 import ReportsPage from './pages/ReportsPage'
@@ -23,9 +24,9 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<SalesPage />} />
-        <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/" element={<RequirePermission permission="sales"><SalesPage /></RequirePermission>} />
+        <Route path="/clients" element={<RequirePermission permission="clients"><ClientsPage /></RequirePermission>} />
+        <Route path="/products" element={<RequirePermission permission="products"><ProductsPage /></RequirePermission>} />
         <Route
           path="/users"
           element={
@@ -42,7 +43,7 @@ function App() {
             </AdminRoute>
           }
         />
-        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/reports" element={<RequirePermission permission="reports"><ReportsPage /></RequirePermission>} />
         <Route
           path="/sales-summary"
           element={

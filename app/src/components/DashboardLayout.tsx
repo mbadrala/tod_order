@@ -1,16 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link, Outlet } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { getMe } from "@/lib/api";
 
-function navItems(isAdmin: boolean) {
-  const common = [
-    { label: "Борлуулалт", path: "/" },
-    { label: "Тайлан", path: "/reports" },
-    { label: "Харилцагчид", path: "/clients" },
-    { label: "Бараа", path: "/products" },
+function navItems(isAdmin: boolean, permissions: string[]) {
+  const allCommon = [
+    { label: "Борлуулалт", path: "/", permission: "sales" },
+    { label: "Тайлан", path: "/reports", permission: "reports" },
+    { label: "Харилцагчид", path: "/clients", permission: "clients" },
+    { label: "Бараа", path: "/products", permission: "products" },
   ]
+  const common = isAdmin
+    ? allCommon
+    : allCommon.filter((item) => permissions.includes(item.permission))
   const admin = isAdmin
     ? [
         { label: "Нэгтгэл", path: "/sales-summary" },
@@ -25,8 +29,15 @@ function navItems(isAdmin: boolean) {
 function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem("user") || "{}"));
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    getMe().then((data) => {
+      localStorage.setItem("user", JSON.stringify(data));
+      setUser(data);
+    }).catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -53,7 +64,7 @@ function DashboardLayout() {
         <Separator />
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {(() => { const { common, admin } = navItems(user.is_admin); return (
+          {(() => { const { common, admin } = navItems(user.is_admin, user.permissions || []); return (
             <>
               {common.map((item) => (
                 <Link

@@ -19,29 +19,33 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export async function login(username: string, password: string) {
-  return request<{ token: string; user: { id: number; name: string; username: string; is_admin: boolean } }>(
+  return request<{ token: string; user: { id: number; name: string; username: string; is_admin: boolean; permissions: string[] } }>(
     '/auth/login',
     { method: 'POST', body: JSON.stringify({ username, password }) }
   )
 }
 
 export async function getUsers() {
-  return request<Array<{ id: number; name: string; username: string; is_admin: number; created_at: string; updated_at: string }>>('/auth/users')
+  return request<Array<{ id: number; name: string; username: string; is_admin: number; permissions: string[]; created_at: string; updated_at: string }>>('/auth/users')
 }
 
-export async function createUser(data: { name: string; username: string; password: string }) {
-  return request<{ message: string; user: { id: number; name: string; username: string } }>(
+export async function createUser(data: { name: string; username: string; password: string; permissions?: string[] }) {
+  return request<{ message: string; user: { id: number; name: string; username: string; permissions: string[] } }>(
     '/auth/register',
     { method: 'POST', body: JSON.stringify(data) }
   )
 }
 
-export async function updateUser(id: number, data: { name?: string; username?: string; password?: string }) {
-  return request(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+export async function updateUser(id: number, data: { name?: string; username?: string; password?: string; permissions?: string[] }) {
+  return request<{ id: number; name: string; username: string; is_admin: number; permissions: string[] }>(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 }
 
 export async function deleteUser(id: number) {
   return request<{ message: string }>(`/auth/users/${id}`, { method: 'DELETE' })
+}
+
+export async function getMe() {
+  return request<{ id: number; name: string; username: string; is_admin: boolean; permissions: string[] }>('/auth/me')
 }
 
 export interface Client {

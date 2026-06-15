@@ -13,10 +13,12 @@ use Slim\Psr7\Response as SlimResponse;
 class AuthMiddleware implements MiddlewareInterface
 {
     private string $secret;
+    private ?\PDO $pdo;
 
-    public function __construct(string $secret)
+    public function __construct(string $secret, ?\PDO $pdo = null)
     {
         $this->secret = $secret;
+        $this->pdo = $pdo;
     }
 
     public function process(Request $request, RequestHandler $handler): Response
@@ -37,6 +39,21 @@ class AuthMiddleware implements MiddlewareInterface
             $request = $request
                 ->withAttribute('user_id', $decoded->user_id)
                 ->withAttribute('is_admin', $decoded->is_admin ?? false);
+
+            // Fetch permissions fresh from DB so changes take effect immediately
+            $permissions = [];
+            if ($this->pdo) {
+                $stmt = $this->pdo->prepare("SELECT permissions FROM users WHERE id = ?");
+                $stmt->execute([$decoded->user_id]);
+                $user = $stmt->fetch();
+                if ($user && $user['permissions']) {
+                    $permissions = json_decode($user['permissions'], true) ?? [];
+                }
+            }
+            if (empty($permissions)) {
+                $permissions = ["sales","reports","clients","products"];
+            }
+            $request = $request->withAttribute('permissions', $permissions);
         } catch (\Exception $e) {
             return $this->unauthorized('Invalid or expired token');
         }

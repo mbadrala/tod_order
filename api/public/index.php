@@ -10,6 +10,7 @@ use App\Controllers\ProductController;
 use App\Controllers\ReportController;
 use App\Controllers\SaleController;
 use App\Middleware\AuthMiddleware;
+use App\Middleware\PermissionMiddleware;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
@@ -105,11 +106,12 @@ $authController = new AuthController($pdo, $config['jwt_secret']);
 $app->post('/auth/login', [$authController, 'login']);
 
 $app->group('/auth', function (RouteCollectorProxy $group) use ($authController) {
+    $group->get('/me', [$authController, 'me']);
     $group->post('/register', [$authController, 'register']);
     $group->get('/users', [$authController, 'listUsers']);
     $group->put('/users/{id}', [$authController, 'updateUser']);
     $group->delete('/users/{id}', [$authController, 'deleteUser']);
-})->add(new AuthMiddleware($config['jwt_secret']));
+})->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 $clientController = new ClientController($pdo);
 
@@ -120,7 +122,7 @@ $app->group('/clients', function (RouteCollectorProxy $group) use ($clientContro
     $group->get('/{id}', [$clientController, 'get']);
     $group->put('/{id}', [$clientController, 'update']);
     $group->delete('/{id}', [$clientController, 'delete']);
-})->add(new AuthMiddleware($config['jwt_secret']));
+})->add(new PermissionMiddleware('clients'))->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 $productController = new ProductController($pdo);
 
@@ -131,7 +133,7 @@ $app->group('/products', function (RouteCollectorProxy $group) use ($productCont
     $group->post('', [$productController, 'create']);
     $group->put('/{id}', [$productController, 'update']);
     $group->delete('/{id}', [$productController, 'delete']);
-})->add(new AuthMiddleware($config['jwt_secret']));
+})->add(new PermissionMiddleware('products'))->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 $fileController = new FileController($pdo, $config['upload_dir']);
 
@@ -139,7 +141,7 @@ $app->group('/files', function (RouteCollectorProxy $group) use ($fileController
     $group->post('/upload', [$fileController, 'upload']);
     $group->get('/{id}', [$fileController, 'get']);
     $group->delete('/{id}', [$fileController, 'delete']);
-})->add(new AuthMiddleware($config['jwt_secret']));
+})->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 $saleController = new SaleController($pdo);
 
@@ -153,7 +155,7 @@ $app->group('/sales', function (RouteCollectorProxy $group) use ($saleController
     $group->put('/{id}', [$saleController, 'update']);
     $group->delete('/{id}', [$saleController, 'delete']);
     $group->post('/{id}/lock', [$saleController, 'toggleLock']);
-})->add(new AuthMiddleware($config['jwt_secret']));
+})->add(new PermissionMiddleware('sales'))->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 $bankAccountController = new BankAccountController($pdo);
 
@@ -163,7 +165,7 @@ $app->group('/bank-accounts', function (RouteCollectorProxy $group) use ($bankAc
     $group->post('', [$bankAccountController, 'create']);
     $group->put('/{id}', [$bankAccountController, 'update']);
     $group->delete('/{id}', [$bankAccountController, 'delete']);
-})->add(new AuthMiddleware($config['jwt_secret']));
+})->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 $reportController = new ReportController($pdo);
 
@@ -171,11 +173,11 @@ $app->group('/reports', function (RouteCollectorProxy $group) use ($reportContro
     $group->get('/all', [$reportController, 'listAll']);
     $group->get('', [$reportController, 'list']);
     $group->delete('/{sale_id}', [$reportController, 'delete']);
-})->add(new AuthMiddleware($config['jwt_secret']));
+})->add(new PermissionMiddleware('reports'))->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 // Include this before $app->run()
 use App\Controllers\LogController;
 $logController = new LogController($logDir);
-$app->get('/logs', [$logController, 'list'])->add(new AuthMiddleware($config['jwt_secret']));
+$app->get('/logs', [$logController, 'list'])->add(new AuthMiddleware($config['jwt_secret'], $pdo));
 
 $app->run();
