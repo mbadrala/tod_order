@@ -226,7 +226,7 @@ function UsersPage() {
           <DialogBackdrop />
           <DialogPopup>
             <DialogTitle>{editId ? "Хэрэглэгч засах" : "Шинэ хэрэглэгч"}</DialogTitle>
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 max-h-[60vh] space-y-3 overflow-y-auto">
               <input
                 placeholder="Нэр *"
                 value={name}

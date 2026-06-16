@@ -75,7 +75,7 @@ interface FlatRow {
   discount_amount: number;
   user_name: string;
   created_at: string;
-  is_locked: number;
+  is_locked?: number;
   bankAllocs: Record<string, number>;
 }
 

@@ -62,7 +62,7 @@ class AuthController
 
     public function listUsers(Request $request, Response $response): Response
     {
-        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, permissions, bank_account_ids, created_at, updated_at FROM users ORDER BY id");
+        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, permissions, bank_account_ids, created_at, updated_at FROM users WHERE (is_superadmin IS NULL OR is_superadmin = 0) ORDER BY id");
         $users = $stmt->fetchAll();
         foreach ($users as &$u) {
             $u['permissions'] = $u['permissions'] ? json_decode($u['permissions']) : ["sales","reports","clients","products"];
@@ -81,10 +81,14 @@ class AuthController
             return $this->json($response, ['error' => 'admin only'], 403);
         }
 
-        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT id, is_superadmin FROM users WHERE id = ?");
         $stmt->execute([$args['id']]);
-        if (!$stmt->fetch()) {
+        $target = $stmt->fetch();
+        if (!$target) {
             return $this->json($response, ['error' => 'user not found'], 404);
+        }
+        if ($target['is_superadmin']) {
+            return $this->json($response, ['error' => 'cannot update superadmin'], 403);
         }
 
         $body = $request->getParsedBody();
@@ -140,7 +144,7 @@ class AuthController
             return $this->json($response, ['error' => 'admin only'], 403);
         }
 
-        $stmt = $this->pdo->prepare("SELECT id, is_admin FROM users WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT id, is_admin, is_superadmin FROM users WHERE id = ?");
         $stmt->execute([$args['id']]);
         $user = $stmt->fetch();
 
@@ -148,7 +152,7 @@ class AuthController
             return $this->json($response, ['error' => 'user not found'], 404);
         }
 
-        if ($user['is_admin']) {
+        if ($user['is_admin'] || $user['is_superadmin']) {
             return $this->json($response, ['error' => 'cannot delete admin'], 403);
         }
 
@@ -159,7 +163,7 @@ class AuthController
     public function me(Request $request, Response $response): Response
     {
         $userId = $request->getAttribute('user_id');
-        $stmt = $this->pdo->prepare("SELECT id, name, username, is_admin, permissions, bank_account_ids FROM users WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT id, name, username, is_admin, is_superadmin, permissions, bank_account_ids FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
         if (!$user) {
@@ -172,6 +176,7 @@ class AuthController
             'name' => $user['name'],
             'username' => $user['username'],
             'is_admin' => (bool)$user['is_admin'],
+            'is_superadmin' => (bool)$user['is_superadmin'],
             'permissions' => $perms,
             'bank_account_ids' => $bankIds,
         ]);
@@ -195,7 +200,7 @@ class AuthController
             return $this->json($response, ['error' => 'invalid credentials'], 401);
         }
 
-        $token = $this->generateToken($user['id'], (bool)$user['is_admin'], $user['username']);
+        $token = $this->generateToken($user['id'], (bool)$user['is_admin'], $user['username'], (bool)($user['is_superadmin'] ?? false));
 
         $perms = $user['permissions'] ? json_decode($user['permissions']) : ["sales","reports","clients","products"];
         $bankIds = $user['bank_account_ids'] ? json_decode($user['bank_account_ids']) : [];
@@ -207,17 +212,19 @@ class AuthController
                 'name' => $user['name'],
                 'username' => $user['username'],
                 'is_admin' => (bool)$user['is_admin'],
+                'is_superadmin' => (bool)($user['is_superadmin'] ?? false),
                 'permissions' => $perms,
                 'bank_account_ids' => $bankIds,
             ],
         ]);
     }
 
-    private function generateToken(int $userId, bool $isAdmin, string $username): string
+    private function generateToken(int $userId, bool $isAdmin, string $username, bool $isSuperadmin = false): string
     {
         $payload = [
             'user_id' => $userId,
             'is_admin' => $isAdmin,
+            'is_superadmin' => $isSuperadmin,
             'username' => $username,
             'iat' => time(),
             'exp' => time() + 86400 * 7,

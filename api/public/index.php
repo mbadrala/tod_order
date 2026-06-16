@@ -25,6 +25,7 @@ require __DIR__ . '/../config/database.php';
 $pdo = getDatabase($config['db_path']);
 initializeDatabase($pdo);
 seedAdmin($pdo);
+seedSuperAdmin($pdo);
 
 $app = AppFactory::create();
 

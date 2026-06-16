@@ -16,8 +16,8 @@ class LogController
 
     public function list(Request $request, Response $response): Response
     {
-        if (!$request->getAttribute('is_admin')) {
-            return $this->json($response, ['error' => 'admin only'], 403);
+        if (!$request->getAttribute('is_superadmin')) {
+            return $this->json($response, ['error' => 'superadmin only'], 403);
         }
 
         if (!is_dir($this->logDir)) {

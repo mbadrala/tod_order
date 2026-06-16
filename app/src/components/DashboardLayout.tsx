@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { getMe } from "@/lib/api";
 
-function navItems(isAdmin: boolean, permissions: string[]) {
+function navItems(isAdmin: boolean, isSuperadmin: boolean, permissions: string[]) {
   const allCommon = [
     { label: "Борлуулалт", path: "/", permission: "sales" },
     { label: "Тайлан", path: "/reports", permission: "reports" },
@@ -20,7 +20,7 @@ function navItems(isAdmin: boolean, permissions: string[]) {
         { label: "Нэгтгэл", path: "/sales-summary" },
         { label: "Банкны данс", path: "/bank-accounts" },
         { label: "Хэрэглэгчид", path: "/users" },
-        { label: "Системийн лог", path: "/logs" },
+        ...(isSuperadmin ? [{ label: "Системийн лог", path: "/logs" }] : []),
       ]
     : []
   return { common, admin }
@@ -68,7 +68,7 @@ function DashboardLayout() {
         <Separator />
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {(() => { const { common, admin } = navItems(user.is_admin, user.permissions || []); return (
+          {(() => { const { common, admin } = navItems(user.is_admin, user.is_superadmin, user.permissions || []); return (
             <>
               {common.map((item) => (
                 <Link

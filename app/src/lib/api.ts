@@ -19,7 +19,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export async function login(username: string, password: string) {
-  return request<{ token: string; user: { id: number; name: string; username: string; is_admin: boolean; permissions: string[]; bank_account_ids: number[] } }>(
+  return request<{ token: string; user: { id: number; name: string; username: string; is_admin: boolean; is_superadmin: boolean; permissions: string[]; bank_account_ids: number[] } }>(
     '/auth/login',
     { method: 'POST', body: JSON.stringify({ username, password }) }
   )
@@ -45,7 +45,7 @@ export async function deleteUser(id: number) {
 }
 
 export async function getMe() {
-  return request<{ id: number; name: string; username: string; is_admin: boolean; permissions: string[]; bank_account_ids: number[] }>('/auth/me')
+  return request<{ id: number; name: string; username: string; is_admin: boolean; is_superadmin: boolean; permissions: string[]; bank_account_ids: number[] }>('/auth/me')
 }
 
 export interface Client {

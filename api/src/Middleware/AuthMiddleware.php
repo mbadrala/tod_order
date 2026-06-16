@@ -38,7 +38,8 @@ class AuthMiddleware implements MiddlewareInterface
             $decoded = JWT::decode($token, new Key($this->secret, 'HS256'));
             $request = $request
                 ->withAttribute('user_id', $decoded->user_id)
-                ->withAttribute('is_admin', $decoded->is_admin ?? false);
+                ->withAttribute('is_admin', $decoded->is_admin ?? false)
+                ->withAttribute('is_superadmin', $decoded->is_superadmin ?? false);
 
             // Fetch permissions fresh from DB so changes take effect immediately
             $permissions = ["sales","reports","clients","products"];

@@ -143,6 +143,13 @@ function initializeDatabase(PDO $pdo): void
         // column already exists
     }
 
+    // migration: add is_superadmin column
+    try {
+        $pdo->exec("ALTER TABLE users ADD COLUMN is_superadmin INTEGER NOT NULL DEFAULT 0");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
     // migration: add cash_amount and deferred_amount columns
     try {
         $pdo->exec("ALTER TABLE sales ADD COLUMN cash_amount REAL NOT NULL DEFAULT 0");
@@ -260,5 +267,24 @@ function seedAdmin(PDO $pdo): void
             "INSERT INTO users (name, username, password_hash, is_admin, created_at) VALUES (?, ?, ?, 1, ?)"
         );
         $stmt->execute(['Administrator', 'admin', $hash, date('Y-m-d H:i:s')]);
+    }
+}
+
+function seedSuperAdmin(PDO $pdo): void
+{
+    $username = $_ENV['SUPER_ADMIN_USERNAME'] ?? '';
+    $password = $_ENV['SUPER_ADMIN_PASSWORD'] ?? '';
+
+    if ($username === '' || $password === '') return;
+
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->execute([$username]);
+
+    if (!$stmt->fetch()) {
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        $stmt = $pdo->prepare(
+            "INSERT INTO users (name, username, password_hash, is_admin, is_superadmin, created_at) VALUES (?, ?, ?, 1, 1, ?)"
+        );
+        $stmt->execute(['Super Admin', $username, $hash, date('Y-m-d H:i:s')]);
     }
 }
