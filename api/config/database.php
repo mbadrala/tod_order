@@ -238,6 +238,7 @@ function initializeDatabase(PDO $pdo): void
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_reports_sale_id ON reports(sale_id)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sales_sale_date_id ON sales(sale_date DESC, id DESC)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sales_user_id ON sales(user_id)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sale_bank_allocations_sale_id ON sale_bank_allocations(sale_id)");
 }
 
 function seedAdmin(PDO $pdo): void

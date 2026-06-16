@@ -111,7 +111,7 @@ class ReportController
         $total = (int)$countStmt->fetchColumn();
 
         $offset = ($page - 1) * $perPage;
-        $sql = "SELECT r.* FROM reports r $where ORDER BY r.sale_date DESC, r.id DESC LIMIT ? OFFSET ?";
+        $sql = "SELECT r.*, COALESCE(s.is_locked, 0) AS is_locked FROM reports r LEFT JOIN sales s ON r.sale_id = s.id $where ORDER BY r.sale_date DESC, r.id DESC LIMIT ? OFFSET ?";
         $execBinds = $binds;
         $execBinds[] = $perPage;
         $execBinds[] = $offset;
@@ -240,7 +240,7 @@ class ReportController
 
         $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
-        $dataStmt = $this->pdo->prepare("SELECT r.* FROM reports r $where ORDER BY r.sale_date DESC, r.id DESC");
+        $dataStmt = $this->pdo->prepare("SELECT r.*, COALESCE(s.is_locked, 0) AS is_locked FROM reports r LEFT JOIN sales s ON r.sale_id = s.id $where ORDER BY r.sale_date DESC, r.id DESC");
         $dataStmt->execute($binds);
         $reports = $dataStmt->fetchAll();
 

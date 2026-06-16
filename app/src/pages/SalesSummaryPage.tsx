@@ -1,5 +1,5 @@
-import { Lock, LockOpen, Loader2 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ClientSelect } from "@/components/ui/client-select";
@@ -11,7 +11,7 @@ import {
   PaginationNext,
   PaginationLink,
 } from "@/components/ui/pagination";
-import { getSalesSummary, getBankAccounts, getClientsAll, toggleSaleLock, type SaleSummary, type BankAccount, type Client } from "@/lib/api";
+import { getSalesSummary, getBankAccounts, getClientsAll, type SaleSummary, type BankAccount, type Client } from "@/lib/api";
 import { getPageNumbers, formatDateLocal } from "@/lib/utils";
 
 const PER_PAGE = 100;
@@ -23,6 +23,7 @@ function formatNum(n: number) {
 function SalesSummaryPage() {
   const [data, setData] = useState<SaleSummary[]>([]);
   const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -38,9 +39,8 @@ function SalesSummaryPage() {
     getClientsAll().then(setClients);
   }, []);
 
-  const [loadingId, setLoadingId] = useState<number | null>(null);
-
   const fetchData = useCallback((p: number) => {
+    setLoading(true);
     const filters: Record<string, string> = {};
     if (clientCode || clientName) filters.client_name = clientName || clientCode;
     if (fromDate) filters.from = formatDateLocal(fromDate);
@@ -49,44 +49,31 @@ function SalesSummaryPage() {
       setData(res.data);
       setTotal(res.total);
       setTotalPages(Math.ceil(res.total / PER_PAGE));
-    });
+    }).finally(() => setLoading(false));
   }, [clientCode, clientName, fromDate, toDate]);
-
-  const toggleLock = useCallback(async (id: number) => {
-    setLoadingId(id);
-    try {
-      await toggleSaleLock(id);
-      fetchData(page);
-    } catch (e) {
-      fetchData(page);
-      alert(e instanceof Error ? e.message : 'Алдаа гарлаа');
-    } finally {
-      setLoadingId(null);
-    }
-  }, [fetchData, page]);
 
   useEffect(() => { fetchData(page); }, [page, fetchData]);
 
   useEffect(() => { setPage(1); }, [clientCode, clientName, fromDate, toDate]);
 
-  const statusEl = (s: string) => {
-    if (s === "draft")
-      return (
-        <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-          Түр хадгалсан
-        </span>
-      );
-    return (
-      <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-        Баталгаажсан
-      </span>
-    );
-  };
+  const totals = useMemo(() => {
+    const t = { total_amount: 0, cash_amount: 0, deferred_amount: 0, discount_amount: 0, bank: {} as Record<string, number> };
+    for (const s of data) {
+      t.total_amount += s.total_amount;
+      t.cash_amount += s.cash_amount;
+      t.deferred_amount += s.deferred_amount;
+      t.discount_amount += s.discount_amount;
+      for (const [baId, amount] of Object.entries(s.bank_allocations)) {
+        t.bank[baId] = (t.bank[baId] || 0) + amount;
+      }
+    }
+    return t;
+  }, [data]);
 
   return (
     <div>
       <h1 className="text-lg font-medium">Нэгтгэл</h1>
-      <p className="text-sm text-muted-foreground mt-1">Нийт: {total} борлуулалт</p>
+      <p className="text-sm text-muted-foreground mt-1">Нийт: {total} өдөр</p>
       <Separator className="my-4" />
 
       <div className="flex flex-wrap gap-2 mb-4 items-end">
@@ -119,10 +106,6 @@ function SalesSummaryPage() {
           <thead>
             <tr className="border-b">
               <th className="h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Огноо</th>
-              <th className="h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Төлөв</th>
-              <th className="h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Харилцагч</th>
-              <th className="h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Падаан №</th>
-              <th className="h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Борлуулалтын төлөв</th>
               <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Дүн</th>
               <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Бэлэн</th>
               {bankAccounts.map((ba) => (
@@ -139,53 +122,63 @@ function SalesSummaryPage() {
               ))}
               <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Дараа төлбөр</th>
               <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Хөнгөлөлт</th>
-              <th className="h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Бүртгэсэн</th>
             </tr>
           </thead>
           <tbody>
-            {data.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={10 + bankAccounts.length} className="h-24 text-center text-muted-foreground">
+                <td colSpan={3 + bankAccounts.length} className="text-center">
+                  <div className="flex items-center justify-center h-24 gap-2 text-muted-foreground">
+                    <Loader2 className="size-5 animate-spin" />
+                    <span className="text-sm">Уншиж байна...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : data.length === 0 ? (
+              <tr>
+                <td colSpan={3 + bankAccounts.length} className="h-24 text-center text-muted-foreground">
                   Борлуулалт олдсонгүй
                 </td>
               </tr>
             ) : (
-              data.map((s) => (
-                <tr key={s.id} className="border-b transition-colors hover:bg-muted/50">
-                  <td className="px-2 py-1.5 align-middle text-xs whitespace-nowrap">{s.sale_date}</td>
-                  <td className="px-2 py-1.5 align-middle text-xs">
-                    <button
-                      onClick={() => toggleLock(s.id)}
-                      disabled={loadingId !== null}
-                      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
-                        s.is_locked
-                          ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400"
-                      }`}
-                    >
-                      {loadingId === s.id ? <Loader2 className="size-3 animate-spin" /> : s.is_locked ? <><Lock className="size-3" /><span>Түгжээтэй</span></> : <><LockOpen className="size-3" /><span>Нээлттэй</span></>}
-                    </button>
-                  </td>
-                  <td className="px-2 py-1.5 align-middle text-xs truncate max-w-[150px]">{s.client_name || s.client_code || "—"}</td>
-                  <td className="px-2 py-1.5 align-middle text-xs">{s.slip_number || "—"}</td>
-                  <td className="px-2 py-1.5 align-middle text-xs whitespace-nowrap">{statusEl(s.status)}</td>
-                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(s.total_amount)}</td>
-                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(s.cash_amount)}</td>
+              <>
+                <tr className="border-b bg-muted/30 font-semibold">
+                  <td className="px-2 py-1.5 align-middle text-xs whitespace-nowrap">Нийт</td>
+                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(totals.total_amount)}</td>
+                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(totals.cash_amount)}</td>
                   {bankAccounts.map((ba) => {
-                    const alloc = s.bank_allocations[String(ba.id)];
+                    const amount = totals.bank[String(ba.id)];
                     return (
                       <td key={ba.id} className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">
-                        {alloc ? formatNum(alloc) : "-"}
+                        {amount ? formatNum(amount) : "-"}
                       </td>
                     );
                   })}
-                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(s.deferred_amount)}</td>
-                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums text-green-600">
-                    {s.discount_amount > 0 ? formatNum(s.discount_amount) : "-"}
+                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(totals.deferred_amount)}</td>
+                  <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">
+                    {totals.discount_amount > 0 ? formatNum(totals.discount_amount) : "-"}
                   </td>
-                  <td className="px-2 py-1.5 align-middle text-xs truncate max-w-[100px]">{s.user_name || "—"}</td>
                 </tr>
-              ))
+                {data.map((s) => (
+                  <tr key={s.sale_date} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="px-2 py-1.5 align-middle text-xs whitespace-nowrap">{s.sale_date}</td>
+                    <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(s.total_amount)}</td>
+                    <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(s.cash_amount)}</td>
+                    {bankAccounts.map((ba) => {
+                      const alloc = s.bank_allocations[String(ba.id)];
+                      return (
+                        <td key={ba.id} className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">
+                          {alloc ? formatNum(alloc) : "-"}
+                        </td>
+                      );
+                    })}
+                    <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums">{formatNum(s.deferred_amount)}</td>
+                    <td className="px-2 py-1.5 align-middle text-xs text-right tabular-nums text-green-600">
+                      {s.discount_amount > 0 ? formatNum(s.discount_amount) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </>
             )}
           </tbody>
         </table>

@@ -307,9 +307,6 @@ class SaleController
 
         $params = $request->getQueryParams();
         $clientName = trim($params['client_name'] ?? '');
-        $slipNumber = trim($params['slip_number'] ?? '');
-        $totalMin = $params['total_min'] ?? '';
-        $totalMax = $params['total_max'] ?? '';
         $from = $params['from'] ?? '';
         $to = $params['to'] ?? '';
         $page = max(1, (int)($params['page'] ?? 1));
@@ -323,18 +320,6 @@ class SaleController
             $binds[] = "%$clientName%";
             $binds[] = "%$clientName%";
         }
-        if ($slipNumber !== '') {
-            $conditions[] = "s.slip_number LIKE ?";
-            $binds[] = "%$slipNumber%";
-        }
-        if ($totalMin !== '') {
-            $conditions[] = "s.total_amount >= ?";
-            $binds[] = (float)$totalMin;
-        }
-        if ($totalMax !== '') {
-            $conditions[] = "s.total_amount <= ?";
-            $binds[] = (float)$totalMax;
-        }
         if ($from !== '') {
             $conditions[] = "s.sale_date >= ?";
             $binds[] = $from;
@@ -346,17 +331,21 @@ class SaleController
 
         $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM sales s $where");
+        $countStmt = $this->pdo->prepare("SELECT COUNT(DISTINCT s.sale_date) FROM sales s $where");
         $countStmt->execute($binds);
         $total = (int)$countStmt->fetchColumn();
 
         $offset = ($page - 1) * $perPage;
-        $sql = "SELECT s.*, u.name AS user_name,
-                       (SELECT COALESCE(SUM(amount), 0) FROM sale_bank_allocations WHERE sale_id = s.id) AS bank_total
+        $sql = "SELECT
+                    s.sale_date,
+                    COALESCE(SUM(s.total_amount), 0) AS total_amount,
+                    COALESCE(SUM(s.cash_amount), 0) AS cash_amount,
+                    COALESCE(SUM(s.deferred_amount), 0) AS deferred_amount,
+                    COALESCE(SUM(s.discount_amount), 0) AS discount_amount
                 FROM sales s
-                LEFT JOIN users u ON s.user_id = u.id
                 $where
-                ORDER BY s.sale_date DESC, s.id DESC
+                GROUP BY s.sale_date
+                ORDER BY s.sale_date DESC
                 LIMIT ? OFFSET ?";
         $execBinds = $binds;
         $execBinds[] = $perPage;
@@ -367,22 +356,23 @@ class SaleController
 
         // Attach per-bank allocation breakdown
         if (!empty($sales)) {
-            $saleIds = array_column($sales, 'id');
-            $placeholders = implode(',', array_fill(0, count($saleIds), '?'));
+            $dates = array_column($sales, 'sale_date');
+            $placeholders = implode(',', array_fill(0, count($dates), '?'));
             $stmt = $this->pdo->prepare(
-                "SELECT sale_id, bank_account_id, COALESCE(SUM(amount), 0) AS total
-                 FROM sale_bank_allocations
-                 WHERE sale_id IN ($placeholders)
-                 GROUP BY sale_id, bank_account_id"
+                "SELECT s.sale_date, sba.bank_account_id, COALESCE(SUM(sba.amount), 0) AS total
+                 FROM sale_bank_allocations sba
+                 JOIN sales s ON sba.sale_id = s.id
+                 WHERE s.sale_date IN ($placeholders)
+                 GROUP BY s.sale_date, sba.bank_account_id"
             );
-            $stmt->execute($saleIds);
+            $stmt->execute($dates);
             $allocs = $stmt->fetchAll();
             $allocLookup = [];
             foreach ($allocs as $a) {
-                $allocLookup[$a['sale_id']][$a['bank_account_id']] = (float)$a['total'];
+                $allocLookup[$a['sale_date']][$a['bank_account_id']] = (float)$a['total'];
             }
             foreach ($sales as &$sale) {
-                $sale['bank_allocations'] = $allocLookup[$sale['id']] ?? [];
+                $sale['bank_allocations'] = $allocLookup[$sale['sale_date']] ?? [];
             }
             unset($sale);
         }

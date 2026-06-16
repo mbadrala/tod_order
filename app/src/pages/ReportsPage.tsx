@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { Lock, LockOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -18,6 +19,7 @@ import {
   getBankAccounts,
   getClientsAll,
   getUsers,
+  toggleSaleLock,
   type BankAccount,
   type Client,
   type Report,
@@ -73,6 +75,7 @@ interface FlatRow {
   discount_amount: number;
   user_name: string;
   created_at: string;
+  is_locked: number;
   bankAllocs: Record<string, number>;
 }
 
@@ -102,6 +105,7 @@ function ReportsPage() {
     sale_id: number;
     name: string;
   } | null>(null);
+  const [lockLoadingId, setLockLoadingId] = useState<number | null>(null);
 
   const loadMeta = async () => {
     try {
@@ -195,6 +199,18 @@ function ReportsPage() {
     }
   };
 
+  const handleLockToggle = async (saleId: number) => {
+    setLockLoadingId(saleId);
+    try {
+      await toggleSaleLock(saleId);
+      await fetchReport(currentPage);
+    } catch {
+      await fetchReport(currentPage);
+    } finally {
+      setLockLoadingId(null);
+    }
+  };
+
   const flatRows: FlatRow[] = useMemo(() => {
     const rows: FlatRow[] = [];
     for (const r of data) {
@@ -219,6 +235,7 @@ function ReportsPage() {
         discount_amount: r.discount_amount ?? 0,
         user_name: r.user_name,
         created_at: r.created_at,
+        is_locked: r.is_locked,
         bankAllocs: { ...bankByAccountId },
       });
     }
@@ -609,6 +626,11 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
                   Огноо
                 </th>
+                {isAdmin() && (
+                  <th className="whitespace-nowrap px-2 py-2 font-medium">
+                    Түгжээ
+                  </th>
+                )}
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
                   Харилцагчийн код
                 </th>
@@ -692,6 +714,24 @@ function ReportsPage() {
                           >
                             {r.sale_date}
                           </td>
+                          {isAdmin() && (
+                            <td
+                              className="whitespace-nowrap px-2 py-1.5"
+                              rowSpan={span}
+                            >
+                              <button
+                                onClick={() => handleLockToggle(r.sale_id)}
+                                disabled={lockLoadingId !== null}
+                                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
+                                  r.is_locked
+                                    ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+                                    : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400"
+                                }`}
+                              >
+                                {lockLoadingId === r.sale_id ? <Loader2 className="size-3 animate-spin" /> : r.is_locked ? <><Lock className="size-3" /><span>Түгжээтэй</span></> : <><LockOpen className="size-3" /><span>Нээлттэй</span></>}
+                              </button>
+                            </td>
+                          )}
                           <td
                             className="whitespace-nowrap px-2 py-1.5"
                             rowSpan={span}
