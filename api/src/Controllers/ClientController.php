@@ -27,15 +27,15 @@ class ClientController
         $binds = [];
 
         if ($code !== '') {
-            $conditions[] = "client_code LIKE ?";
+            $conditions[] = "like_ci(?, client_code)";
             $binds[] = "%$code%";
         }
         if ($name !== '') {
-            $conditions[] = "name LIKE ?";
+            $conditions[] = "like_ci(?, name)";
             $binds[] = "%$name%";
         }
         if ($phone !== '') {
-            $conditions[] = "phone LIKE ?";
+            $conditions[] = "like_ci(?, phone)";
             $binds[] = "%$phone%";
         }
 
@@ -71,15 +71,15 @@ class ClientController
         $binds = [];
 
         if ($code !== '') {
-            $conditions[] = "client_code LIKE ?";
+            $conditions[] = "like_ci(?, client_code)";
             $binds[] = "%$code%";
         }
         if ($name !== '') {
-            $conditions[] = "name LIKE ?";
+            $conditions[] = "like_ci(?, name)";
             $binds[] = "%$name%";
         }
         if ($phone !== '') {
-            $conditions[] = "phone LIKE ?";
+            $conditions[] = "like_ci(?, phone)";
             $binds[] = "%$phone%";
         }
 

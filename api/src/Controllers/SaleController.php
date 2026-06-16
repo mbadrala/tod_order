@@ -237,12 +237,12 @@ class SaleController
         $binds = [];
 
         if ($clientName !== '') {
-            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $conditions[] = "(like_ci(?, s.client_name) OR like_ci(?, s.client_code))";
             $binds[] = "%$clientName%";
             $binds[] = "%$clientName%";
         }
         if ($slipNumber !== '') {
-            $conditions[] = "s.slip_number LIKE ?";
+            $conditions[] = "like_ci(?, s.slip_number)";
             $binds[] = "%$slipNumber%";
         }
         if ($totalMin !== '') {
@@ -316,7 +316,7 @@ class SaleController
         $binds = [];
 
         if ($clientName !== '') {
-            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $conditions[] = "(like_ci(?, s.client_name) OR like_ci(?, s.client_code))";
             $binds[] = "%$clientName%";
             $binds[] = "%$clientName%";
         }
@@ -400,7 +400,7 @@ class SaleController
         $binds = [];
 
         if ($clientName !== '') {
-            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $conditions[] = "(like_ci(?, s.client_name) OR like_ci(?, s.client_code))";
             $binds[] = "%$clientName%";
             $binds[] = "%$clientName%";
         }
@@ -469,7 +469,7 @@ class SaleController
         $binds = [];
 
         if ($clientName !== '') {
-            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $conditions[] = "(like_ci(?, s.client_name) OR like_ci(?, s.client_code))";
             $binds[] = "%$clientName%";
             $binds[] = "%$clientName%";
         }

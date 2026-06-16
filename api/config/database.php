@@ -5,6 +5,13 @@ function getDatabase(string $dbPath): PDO
     $pdo = new PDO("sqlite:$dbPath");
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+    $pdo->sqliteCreateFunction('like_ci', function ($pattern, $value) {
+        $pattern = str_replace(['%', '_'], '', $pattern);
+        if ($pattern === '') return true;
+        return mb_stripos($value, $pattern) !== false;
+    });
+
     return $pdo;
 }
 

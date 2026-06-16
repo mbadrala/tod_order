@@ -25,11 +25,11 @@ class ProductController
         $conditions = [];
         $binds = [];
         if ($code !== '') {
-            $conditions[] = "code LIKE ?";
+            $conditions[] = "like_ci(?, code)";
             $binds[] = "%$code%";
         }
         if ($name !== '') {
-            $conditions[] = "name LIKE ?";
+            $conditions[] = "like_ci(?, name)";
             $binds[] = "%$name%";
         }
 
@@ -63,11 +63,11 @@ class ProductController
         $conditions = [];
         $binds = [];
         if ($code !== '') {
-            $conditions[] = "code LIKE ?";
+            $conditions[] = "like_ci(?, code)";
             $binds[] = "%$code%";
         }
         if ($name !== '') {
-            $conditions[] = "name LIKE ?";
+            $conditions[] = "like_ci(?, name)";
             $binds[] = "%$name%";
         }
 

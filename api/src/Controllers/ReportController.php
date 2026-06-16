@@ -64,11 +64,11 @@ class ReportController
             $binds[] = $clientCode;
         }
         if ($productCode !== '') {
-            $conditions[] = "r.product_code LIKE ?";
+            $conditions[] = "like_ci(?, r.product_code)";
             $binds[] = "%$productCode%";
         }
         if ($productName !== '') {
-            $conditions[] = "r.product_name LIKE ?";
+            $conditions[] = "like_ci(?, r.product_name)";
             $binds[] = "%$productName%";
         }
         if ($amountMin !== '') {
@@ -198,11 +198,11 @@ class ReportController
             $binds[] = $clientCode;
         }
         if ($productCode !== '') {
-            $conditions[] = "r.product_code LIKE ?";
+            $conditions[] = "like_ci(?, r.product_code)";
             $binds[] = "%$productCode%";
         }
         if ($productName !== '') {
-            $conditions[] = "r.product_name LIKE ?";
+            $conditions[] = "like_ci(?, r.product_name)";
             $binds[] = "%$productName%";
         }
         if ($amountMin !== '') {
