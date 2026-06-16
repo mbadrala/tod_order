@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function formatDateLocal(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export function getPageNumbers(current: number, total: number, maxVisible: number = 7): (number | "...")[] {
   if (total <= maxVisible) return Array.from({ length: total }, (_, i) => i + 1)
 

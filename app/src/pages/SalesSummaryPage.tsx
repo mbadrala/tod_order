@@ -12,7 +12,7 @@ import {
   PaginationLink,
 } from "@/components/ui/pagination";
 import { getSalesSummary, getBankAccounts, getClientsAll, toggleSaleLock, type SaleSummary, type BankAccount, type Client } from "@/lib/api";
-import { getPageNumbers } from "@/lib/utils";
+import { getPageNumbers, formatDateLocal } from "@/lib/utils";
 
 const PER_PAGE = 100;
 
@@ -43,8 +43,8 @@ function SalesSummaryPage() {
   const fetchData = useCallback((p: number) => {
     const filters: Record<string, string> = {};
     if (clientCode || clientName) filters.client_name = clientName || clientCode;
-    if (fromDate) filters.from = fromDate.toISOString().slice(0, 10);
-    if (toDate) filters.to = toDate.toISOString().slice(0, 10);
+    if (fromDate) filters.from = formatDateLocal(fromDate);
+    if (toDate) filters.to = formatDateLocal(toDate);
     getSalesSummary({ ...filters, page: p, per_page: PER_PAGE }).then((res) => {
       setData(res.data);
       setTotal(res.total);

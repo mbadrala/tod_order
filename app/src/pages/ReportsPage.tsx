@@ -24,7 +24,7 @@ import {
 } from "@/lib/api";
 import * as XLSX from "xlsx";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { getPageNumbers } from "@/lib/utils";
+import { getPageNumbers, formatDateLocal } from "@/lib/utils";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
@@ -127,8 +127,8 @@ function ReportsPage() {
     setLoading(true);
     try {
       const filters: Record<string, any> = { page, per_page: perPage };
-      if (fromDate) filters.from = fromDate.toISOString().slice(0, 10);
-      if (toDate) filters.to = toDate.toISOString().slice(0, 10);
+      if (fromDate) filters.from = formatDateLocal(fromDate);
+      if (toDate) filters.to = formatDateLocal(toDate);
       if (clientCode.trim()) filters.client_code = clientCode.trim();
       if (productCode.trim()) filters.product_code = productCode.trim();
       if (productName.trim()) filters.product_name = productName.trim();
@@ -255,8 +255,8 @@ function ReportsPage() {
 
   const exportPdf = () => {
     const params = new URLSearchParams();
-    if (fromDate) params.set("from", fromDate.toISOString().slice(0, 10));
-    if (toDate) params.set("to", toDate.toISOString().slice(0, 10));
+    if (fromDate) params.set("from", formatDateLocal(fromDate));
+    if (toDate) params.set("to", formatDateLocal(toDate));
     if (clientCode.trim()) params.set("client_code", clientCode.trim());
     if (productCode.trim()) params.set("product_code", productCode.trim());
     if (productName.trim()) params.set("product_name", productName.trim());
@@ -275,8 +275,8 @@ function ReportsPage() {
 
   const exportExcel = async () => {
     const filters: Record<string, any> = {};
-    if (fromDate) filters.from = fromDate.toISOString().slice(0, 10);
-    if (toDate) filters.to = toDate.toISOString().slice(0, 10);
+    if (fromDate) filters.from = formatDateLocal(fromDate);
+    if (toDate) filters.to = formatDateLocal(toDate);
     if (clientCode.trim()) filters.client_code = clientCode.trim();
     if (productCode.trim()) filters.product_code = productCode.trim();
     if (productName.trim()) filters.product_name = productName.trim();
