@@ -115,8 +115,9 @@ $app->group('/auth', function (RouteCollectorProxy $group) use ($authController)
 
 $clientController = new ClientController($pdo);
 
+$app->get('/clients/all', [$clientController, 'listAll'])->add(new AuthMiddleware($config['jwt_secret'], $pdo));
+
 $app->group('/clients', function (RouteCollectorProxy $group) use ($clientController) {
-    $group->get('/all', [$clientController, 'listAll']);
     $group->get('', [$clientController, 'list']);
     $group->post('', [$clientController, 'create']);
     $group->get('/{id}', [$clientController, 'get']);
@@ -126,8 +127,9 @@ $app->group('/clients', function (RouteCollectorProxy $group) use ($clientContro
 
 $productController = new ProductController($pdo);
 
+$app->get('/products/all', [$productController, 'listAll'])->add(new AuthMiddleware($config['jwt_secret'], $pdo));
+
 $app->group('/products', function (RouteCollectorProxy $group) use ($productController) {
-    $group->get('/all', [$productController, 'listAll']);
     $group->get('', [$productController, 'list']);
     $group->get('/{id}', [$productController, 'get']);
     $group->post('', [$productController, 'create']);
