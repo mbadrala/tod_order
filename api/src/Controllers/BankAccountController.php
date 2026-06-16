@@ -16,7 +16,26 @@ class BankAccountController
 
     public function list(Request $request, Response $response): Response
     {
-        $stmt = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY id");
+        $isAdmin = $request->getAttribute('is_admin');
+
+        if ($isAdmin) {
+            $stmt = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY id");
+            return $this->json($response, $stmt->fetchAll());
+        }
+
+        $userId = $request->getAttribute('user_id');
+        $stmt = $this->pdo->prepare("SELECT bank_account_ids FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        $ids = $user && $user['bank_account_ids'] ? json_decode($user['bank_account_ids'], true) : [];
+
+        if (empty($ids)) {
+            return $this->json($response, []);
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->pdo->prepare("SELECT * FROM bank_accounts WHERE id IN ($placeholders) ORDER BY id");
+        $stmt->execute($ids);
         return $this->json($response, $stmt->fetchAll());
     }
 

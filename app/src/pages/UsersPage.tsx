@@ -10,7 +10,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { getUsers, createUser, updateUser, deleteUser } from "@/lib/api";
+import { getUsers, createUser, updateUser, deleteUser, getBankAccounts, type BankAccount } from "@/lib/api";
 
 const ALL_PERMISSIONS = [
   { key: "sales", label: "Борлуулалт" },
@@ -25,6 +25,7 @@ interface User {
   username: string;
   is_admin: number;
   permissions: string[];
+  bank_account_ids: number[];
   created_at: string;
 }
 
@@ -37,6 +38,8 @@ function UsersPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [bankAccountIds, setBankAccountIds] = useState<number[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
     id: number;
@@ -53,6 +56,7 @@ function UsersPage() {
 
   useEffect(() => {
     load();
+    getBankAccounts().then(setBankAccounts).catch(() => {});
   }, []);
 
   const resetForm = () => {
@@ -60,6 +64,7 @@ function UsersPage() {
     setUsername("");
     setPassword("");
     setPermissions([]);
+    setBankAccountIds([]);
     setEditId(null);
     setEditingIsAdmin(false);
     setError("");
@@ -69,6 +74,7 @@ function UsersPage() {
     resetForm();
     setEditingIsAdmin(false);
     setPermissions(ALL_PERMISSIONS.map((p) => p.key));
+    setBankAccountIds([]);
     setOpen(true);
   };
 
@@ -77,6 +83,7 @@ function UsersPage() {
     setUsername(u.username);
     setPassword("");
     setPermissions(u.permissions || []);
+    setBankAccountIds(u.bank_account_ids || []);
     setEditId(u.id);
     setEditingIsAdmin(!!u.is_admin);
     setError("");
@@ -86,6 +93,12 @@ function UsersPage() {
   const togglePermission = (key: string) => {
     setPermissions((prev) =>
       prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]
+    );
+  };
+
+  const toggleBankAccount = (id: number) => {
+    setBankAccountIds((prev) =>
+      prev.includes(id) ? prev.filter((ba) => ba !== id) : [...prev, id]
     );
   };
 
@@ -101,6 +114,7 @@ function UsersPage() {
           name: name.trim(),
           username: username.trim(),
           permissions,
+          bank_account_ids: bankAccountIds,
           ...(password ? { password } : {}),
         });
       } else {
@@ -113,6 +127,7 @@ function UsersPage() {
           username: username.trim(),
           password,
           permissions,
+          bank_account_ids: bankAccountIds,
         });
       }
       setOpen(false);
@@ -158,7 +173,6 @@ function UsersPage() {
               <th className="px-4 py-3 font-medium">Нэр</th>
               <th className="px-4 py-3 font-medium">Нэвтрэх нэр</th>
               <th className="px-4 py-3 font-medium">Эрх</th>
-              <th className="px-4 py-3 font-medium">Хандах эрхүүд</th>
               <th className="px-4 py-3 font-medium">Бүртгэгдсэн</th>
               <th className="px-4 py-3 font-medium">Үйлдэл</th>
             </tr>
@@ -177,22 +191,6 @@ function UsersPage() {
                   ) : (
                     <span className="text-muted-foreground">Хэрэглэгч</span>
                   )}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {ALL_PERMISSIONS.map((p) => (
-                      <span
-                        key={p.key}
-                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                          u.permissions?.includes(p.key)
-                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {p.label}
-                      </span>
-                    ))}
-                  </div>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {u.created_at?.slice(0, 10)}
@@ -264,6 +262,27 @@ function UsersPage() {
                           className="size-3.5"
                         />
                         {p.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!editingIsAdmin && bankAccounts.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Банкны данс</p>
+                  <div className="flex flex-wrap gap-2">
+                    {bankAccounts.map((ba) => (
+                      <label
+                        key={ba.id}
+                        className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs cursor-pointer hover:bg-muted has-checked:border-primary has-checked:bg-primary/5"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={bankAccountIds.includes(ba.id)}
+                          onChange={() => toggleBankAccount(ba.id)}
+                          className="size-3.5"
+                        />
+                        {ba.bank_name} - {ba.account_number}{ba.account_name ? ` (${ba.account_name})` : ""}
                       </label>
                     ))}
                   </div>

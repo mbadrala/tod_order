@@ -136,6 +136,13 @@ function initializeDatabase(PDO $pdo): void
         // column already exists
     }
 
+    // migration: add bank_account_ids column
+    try {
+        $pdo->exec("ALTER TABLE users ADD COLUMN bank_account_ids TEXT DEFAULT '[]'");
+    } catch (\Exception $e) {
+        // column already exists
+    }
+
     // migration: add cash_amount and deferred_amount columns
     try {
         $pdo->exec("ALTER TABLE sales ADD COLUMN cash_amount REAL NOT NULL DEFAULT 0");

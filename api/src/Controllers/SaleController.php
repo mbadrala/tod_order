@@ -463,6 +463,15 @@ class SaleController
             return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
         }
 
+        if (!$request->getAttribute('is_admin') && is_array($bankAllocations) && !empty($bankAllocations)) {
+            $allowedIds = $this->getUserBankAccountIds($userId);
+            foreach ($bankAllocations as $a) {
+                if (!in_array((int)$a['bank_account_id'], $allowedIds)) {
+                    return $this->json($response, ['error' => 'Та энэ банкны дансыг ашиглах эрхгүй байна'], 403);
+                }
+            }
+        }
+
         $this->pdo->beginTransaction();
         try {
             $stmt = $this->pdo->prepare("
@@ -564,6 +573,15 @@ class SaleController
 
         $items = $body['items'] ?? null;
         $bankAllocations = $body['bank_allocations'] ?? null;
+
+        if (!$isAdmin && is_array($bankAllocations) && !empty($bankAllocations)) {
+            $allowedIds = $this->getUserBankAccountIds($userId);
+            foreach ($bankAllocations as $a) {
+                if (!in_array((int)$a['bank_account_id'], $allowedIds)) {
+                    return $this->json($response, ['error' => 'Та энэ банкны дансыг ашиглах эрхгүй байна'], 403);
+                }
+            }
+        }
 
         if ($items !== null) {
             if (!is_array($items) || empty($items)) {
@@ -833,6 +851,14 @@ class SaleController
     {
         $this->pdo->prepare("DELETE FROM report_bank_allocations WHERE report_id IN (SELECT id FROM reports WHERE sale_id = ?)")->execute([$saleId]);
         $this->pdo->prepare("DELETE FROM reports WHERE sale_id = ?")->execute([$saleId]);
+    }
+
+    private function getUserBankAccountIds(int $userId): array
+    {
+        $stmt = $this->pdo->prepare("SELECT bank_account_ids FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        return $user && $user['bank_account_ids'] ? json_decode($user['bank_account_ids'], true) : [];
     }
 
     private function json(Response $response, array $data, int $status = 200): Response

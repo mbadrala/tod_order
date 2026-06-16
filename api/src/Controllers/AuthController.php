@@ -28,6 +28,7 @@ class AuthController
         $username = trim($body['username'] ?? '');
         $password = $body['password'] ?? '';
         $permissions = $body['permissions'] ?? null;
+        $bankAccountIds = $body['bank_account_ids'] ?? null;
 
         if ($name === '' || $username === '' || $password === '') {
             return $this->json($response, ['error' => 'name, username, and password are required'], 400);
@@ -45,25 +46,27 @@ class AuthController
 
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $permsJson = $permissions !== null ? json_encode($permissions) : '["sales","reports","clients","products"]';
+        $bankJson = $bankAccountIds !== null ? json_encode($bankAccountIds) : '[]';
         $stmt = $this->pdo->prepare(
-            "INSERT INTO users (name, username, password_hash, permissions, created_at) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO users (name, username, password_hash, permissions, bank_account_ids, created_at) VALUES (?, ?, ?, ?, ?, ?)"
         );
-        $stmt->execute([$name, $username, $hash, $permsJson, date('Y-m-d H:i:s')]);
+        $stmt->execute([$name, $username, $hash, $permsJson, $bankJson, date('Y-m-d H:i:s')]);
 
         $userId = $this->pdo->lastInsertId();
 
         return $this->json($response, [
             'message' => 'User created',
-            'user' => ['id' => (int)$userId, 'name' => $name, 'username' => $username, 'permissions' => json_decode($permsJson)],
+            'user' => ['id' => (int)$userId, 'name' => $name, 'username' => $username, 'permissions' => json_decode($permsJson), 'bank_account_ids' => json_decode($bankJson)],
         ], 201);
     }
 
     public function listUsers(Request $request, Response $response): Response
     {
-        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, permissions, created_at, updated_at FROM users ORDER BY id");
+        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, permissions, bank_account_ids, created_at, updated_at FROM users ORDER BY id");
         $users = $stmt->fetchAll();
         foreach ($users as &$u) {
             $u['permissions'] = $u['permissions'] ? json_decode($u['permissions']) : ["sales","reports","clients","products"];
+            $u['bank_account_ids'] = $u['bank_account_ids'] ? json_decode($u['bank_account_ids']) : [];
         }
         unset($u);
         return $this->json($response, $users);
@@ -101,6 +104,11 @@ class AuthController
             $params[] = json_encode($body['permissions']);
         }
 
+        if (array_key_exists('bank_account_ids', $body)) {
+            $set[] = "bank_account_ids = ?";
+            $params[] = json_encode($body['bank_account_ids']);
+        }
+
         if (!empty($body['password'])) {
             if (strlen($body['password']) < 6) {
                 return $this->json($response, ['error' => 'password must be at least 6 characters'], 400);
@@ -119,9 +127,10 @@ class AuthController
 
         $this->pdo->prepare("UPDATE users SET " . implode(', ', $set) . " WHERE id = ?")->execute($params);
 
-        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, permissions, created_at, updated_at FROM users WHERE id = {$args['id']}");
+        $stmt = $this->pdo->query("SELECT id, name, username, is_admin, permissions, bank_account_ids, created_at, updated_at FROM users WHERE id = {$args['id']}");
         $u = $stmt->fetch();
         $u['permissions'] = $u['permissions'] ? json_decode($u['permissions']) : ["sales","reports","clients","products"];
+        $u['bank_account_ids'] = $u['bank_account_ids'] ? json_decode($u['bank_account_ids']) : [];
         return $this->json($response, $u);
     }
 
@@ -150,19 +159,21 @@ class AuthController
     public function me(Request $request, Response $response): Response
     {
         $userId = $request->getAttribute('user_id');
-        $stmt = $this->pdo->prepare("SELECT id, name, username, is_admin, permissions FROM users WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT id, name, username, is_admin, permissions, bank_account_ids FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
         if (!$user) {
             return $this->json($response, ['error' => 'not found'], 404);
         }
         $perms = $user['permissions'] ? json_decode($user['permissions']) : ["sales","reports","clients","products"];
+        $bankIds = $user['bank_account_ids'] ? json_decode($user['bank_account_ids']) : [];
         return $this->json($response, [
             'id' => (int)$user['id'],
             'name' => $user['name'],
             'username' => $user['username'],
             'is_admin' => (bool)$user['is_admin'],
             'permissions' => $perms,
+            'bank_account_ids' => $bankIds,
         ]);
     }
 
@@ -187,6 +198,7 @@ class AuthController
         $token = $this->generateToken($user['id'], (bool)$user['is_admin'], $user['username']);
 
         $perms = $user['permissions'] ? json_decode($user['permissions']) : ["sales","reports","clients","products"];
+        $bankIds = $user['bank_account_ids'] ? json_decode($user['bank_account_ids']) : [];
 
         return $this->json($response, [
             'token' => $token,
@@ -196,6 +208,7 @@ class AuthController
                 'username' => $user['username'],
                 'is_admin' => (bool)$user['is_admin'],
                 'permissions' => $perms,
+                'bank_account_ids' => $bankIds,
             ],
         ]);
     }
