@@ -385,6 +385,242 @@ class SaleController
         ]);
     }
 
+    public function summaryAll(Request $request, Response $response): Response
+    {
+        if (!$request->getAttribute('is_admin')) {
+            return $this->json($response, ['error' => 'admin only'], 403);
+        }
+
+        $params = $request->getQueryParams();
+        $clientName = trim($params['client_name'] ?? '');
+        $from = $params['from'] ?? '';
+        $to = $params['to'] ?? '';
+
+        $conditions = [];
+        $binds = [];
+
+        if ($clientName !== '') {
+            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $binds[] = "%$clientName%";
+            $binds[] = "%$clientName%";
+        }
+        if ($from !== '') {
+            $conditions[] = "s.sale_date >= ?";
+            $binds[] = $from;
+        }
+        if ($to !== '') {
+            $conditions[] = "s.sale_date <= ?";
+            $binds[] = $to;
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+        $sql = "SELECT
+                    s.sale_date,
+                    COALESCE(SUM(s.total_amount), 0) AS total_amount,
+                    COALESCE(SUM(s.cash_amount), 0) AS cash_amount,
+                    COALESCE(SUM(s.deferred_amount), 0) AS deferred_amount,
+                    COALESCE(SUM(s.discount_amount), 0) AS discount_amount
+                FROM sales s
+                $where
+                GROUP BY s.sale_date
+                ORDER BY s.sale_date DESC";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($binds);
+        $sales = $stmt->fetchAll();
+
+        if (!empty($sales)) {
+            $dates = array_column($sales, 'sale_date');
+            $placeholders = implode(',', array_fill(0, count($dates), '?'));
+            $stmt = $this->pdo->prepare(
+                "SELECT s.sale_date, sba.bank_account_id, COALESCE(SUM(sba.amount), 0) AS total
+                 FROM sale_bank_allocations sba
+                 JOIN sales s ON sba.sale_id = s.id
+                 WHERE s.sale_date IN ($placeholders)
+                 GROUP BY s.sale_date, sba.bank_account_id"
+            );
+            $stmt->execute($dates);
+            $allocs = $stmt->fetchAll();
+            $allocLookup = [];
+            foreach ($allocs as $a) {
+                $allocLookup[$a['sale_date']][$a['bank_account_id']] = (float)$a['total'];
+            }
+            foreach ($sales as &$sale) {
+                $sale['bank_allocations'] = $allocLookup[$sale['sale_date']] ?? [];
+            }
+            unset($sale);
+        }
+
+        return $this->json($response, $sales);
+    }
+
+    public function summaryPdf(Request $request, Response $response): Response
+    {
+        if (!$request->getAttribute('is_admin')) {
+            return $this->json($response, ['error' => 'admin only'], 403);
+        }
+
+        $params = $request->getQueryParams();
+        $clientName = trim($params['client_name'] ?? '');
+        $from = $params['from'] ?? '';
+        $to = $params['to'] ?? '';
+
+        $conditions = [];
+        $binds = [];
+
+        if ($clientName !== '') {
+            $conditions[] = "(s.client_name LIKE ? OR s.client_code LIKE ?)";
+            $binds[] = "%$clientName%";
+            $binds[] = "%$clientName%";
+        }
+        if ($from !== '') {
+            $conditions[] = "s.sale_date >= ?";
+            $binds[] = $from;
+        }
+        if ($to !== '') {
+            $conditions[] = "s.sale_date <= ?";
+            $binds[] = $to;
+        }
+
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+        $sql = "SELECT
+                    s.sale_date,
+                    COALESCE(SUM(s.total_amount), 0) AS total_amount,
+                    COALESCE(SUM(s.cash_amount), 0) AS cash_amount,
+                    COALESCE(SUM(s.deferred_amount), 0) AS deferred_amount,
+                    COALESCE(SUM(s.discount_amount), 0) AS discount_amount
+                FROM sales s
+                $where
+                GROUP BY s.sale_date
+                ORDER BY s.sale_date DESC";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($binds);
+        $sales = $stmt->fetchAll();
+
+        $bankAccounts = $this->pdo->query("SELECT * FROM bank_accounts ORDER BY id")->fetchAll();
+
+        if (!empty($sales)) {
+            $dates = array_column($sales, 'sale_date');
+            $placeholders = implode(',', array_fill(0, count($dates), '?'));
+            $stmt = $this->pdo->prepare(
+                "SELECT s.sale_date, sba.bank_account_id, COALESCE(SUM(sba.amount), 0) AS total
+                 FROM sale_bank_allocations sba
+                 JOIN sales s ON sba.sale_id = s.id
+                 WHERE s.sale_date IN ($placeholders)
+                 GROUP BY s.sale_date, sba.bank_account_id"
+            );
+            $stmt->execute($dates);
+            $allocs = $stmt->fetchAll();
+            $allocLookup = [];
+            foreach ($allocs as $a) {
+                $allocLookup[$a['sale_date']][$a['bank_account_id']] = (float)$a['total'];
+            }
+            foreach ($sales as &$sale) {
+                $sale['bank_allocations'] = $allocLookup[$sale['sale_date']] ?? [];
+            }
+            unset($sale);
+        }
+
+        $bdr = '#d1d5db';
+        $bg = '#f3f4f6';
+
+        $bankTh = '';
+        foreach ($bankAccounts as $ba) {
+            $label = ($ba['bank_name'] ?? '') . (!empty($ba['account_name']) ? ' (' . $ba['account_name'] . ')' : '');
+            $bankTh .= '<th style="padding:3px 4px;border:1px solid ' . $bdr . ';text-align:right;font-weight:bold;white-space:nowrap;font-size:8px;">' . htmlspecialchars($label) . '</th>';
+        }
+
+        $totalAmount = 0;
+        $totalCash = 0;
+        $totalDeferred = 0;
+        $totalDiscount = 0;
+        $bankTotals = [];
+        foreach ($bankAccounts as $ba) {
+            $bankTotals[$ba['id']] = 0;
+        }
+
+        $bodyRows = '';
+        foreach ($sales as $sale) {
+            $totalAmount += $sale['total_amount'];
+            $totalCash += $sale['cash_amount'];
+            $totalDeferred += $sale['deferred_amount'];
+            $totalDiscount += $sale['discount_amount'];
+
+            $bankCells = '';
+            foreach ($bankAccounts as $ba) {
+                $amt = $sale['bank_allocations'][$ba['id']] ?? 0;
+                $bankTotals[$ba['id']] += $amt;
+                $bankCells .= '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($amt) . '</td>';
+            }
+
+            $bodyRows .= '<tr>'
+                . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">' . htmlspecialchars($sale['sale_date']) . '</td>'
+                . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($sale['total_amount']) . '</td>'
+                . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($sale['cash_amount']) . '</td>'
+                . $bankCells
+                . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($sale['deferred_amount']) . '</td>'
+                . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($sale['discount_amount']) . '</td>'
+                . '</tr>';
+        }
+
+        $totalBankCells = '';
+        foreach ($bankAccounts as $ba) {
+            $totalBankCells .= '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;font-weight:bold;">' . number_format($bankTotals[$ba['id']]) . '</td>';
+        }
+
+        $totalRow = '<tr style="font-weight:bold;background:' . $bg . ';">'
+            . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';white-space:nowrap;font-size:8px;">Нийт</td>'
+            . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($totalAmount) . '</td>'
+            . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($totalCash) . '</td>'
+            . $totalBankCells
+            . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($totalDeferred) . '</td>'
+            . '<td style="padding:2px 4px;border:1px solid ' . $bdr . ';text-align:right;white-space:nowrap;font-size:8px;">' . number_format($totalDiscount) . '</td>'
+            . '</tr>';
+
+        $html = '<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<style>
+    body { font-family: "DejaVu Sans", sans-serif; font-size: 8px; margin: 10px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 2px 4px; border: 1px solid ' . $bdr . '; white-space: nowrap; }
+    th { background: ' . $bg . '; font-weight: bold; text-align: left; }
+    .right { text-align: right; }
+</style>
+</head>
+<body>
+<table>
+<thead>
+<tr>
+    <th>Огноо</th>
+    <th class="right">Дүн</th>
+    <th class="right">Бэлэн</th>
+    ' . $bankTh . '
+    <th class="right">Дараа төлбөр</th>
+    <th class="right">Хөнгөлөлт</th>
+</tr>
+</thead>
+<tbody>
+' . $totalRow . '
+' . $bodyRows . '
+</tbody>
+</table>
+</body>
+</html>';
+
+        $dompdf = new \Dompdf\Dompdf();
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+
+        $response->getBody()->write($dompdf->output());
+        return $response
+            ->withHeader('Content-Type', 'application/pdf')
+            ->withHeader('Content-Disposition', 'attachment; filename="neltgel.pdf"');
+    }
+
     public function get(Request $request, Response $response, array $args): Response
     {
         $stmt = $this->pdo->prepare("SELECT * FROM sales WHERE id = ?");

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ClientSelect } from "@/components/ui/client-select";
@@ -11,9 +12,11 @@ import {
   PaginationNext,
   PaginationLink,
 } from "@/components/ui/pagination";
-import { getSalesSummary, getBankAccounts, getClientsAll, type SaleSummary, type BankAccount, type Client } from "@/lib/api";
+import { getSalesSummary, getSalesSummaryAll, getBankAccounts, getClientsAll, type SaleSummary, type BankAccount, type Client } from "@/lib/api";
+import * as XLSX from "xlsx";
 import { getPageNumbers, formatDateLocal } from "@/lib/utils";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
 const PER_PAGE = 100;
 
 function formatNum(n: number) {
@@ -70,10 +73,90 @@ function SalesSummaryPage() {
     return t;
   }, [data]);
 
+  const exportPdf = () => {
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from", formatDateLocal(fromDate));
+    if (toDate) params.set("to", formatDateLocal(toDate));
+    if (clientName || clientCode) params.set("client_name", clientName || clientCode);
+    const token = localStorage.getItem("token");
+    const url = `${API_BASE}/sales/admin-summary/pdf?${params}&token=${encodeURIComponent(token || "")}`;
+    window.open(url, "_blank");
+  };
+
+  const exportExcel = async () => {
+    const filters: Record<string, string> = {};
+    if (fromDate) filters.from = formatDateLocal(fromDate);
+    if (toDate) filters.to = formatDateLocal(toDate);
+    if (clientName || clientCode) filters.client_name = clientName || clientCode;
+    const allData = await getSalesSummaryAll(filters);
+
+    const headers = [
+      "Огноо",
+      "Дүн",
+      "Бэлэн",
+      ...bankAccounts.map(
+        (ba) => ba.account_name ? `${ba.bank_name} (${ba.account_name})` : ba.bank_name,
+      ),
+      "Дараа төлбөр",
+      "Хөнгөлөлт",
+    ];
+
+    const sorted = allData.sort((a, b) => b.sale_date.localeCompare(a.sale_date));
+
+    const ttl = { total_amount: 0, cash_amount: 0, deferred_amount: 0, discount_amount: 0, bank: {} as Record<string, number> };
+    const body: any[][] = sorted.map((s) => {
+      ttl.total_amount += s.total_amount;
+      ttl.cash_amount += s.cash_amount;
+      ttl.deferred_amount += s.deferred_amount;
+      ttl.discount_amount += s.discount_amount;
+      for (const [baId, amount] of Object.entries(s.bank_allocations)) {
+        ttl.bank[baId] = (ttl.bank[baId] || 0) + amount;
+      }
+      return [
+        s.sale_date,
+        s.total_amount,
+        s.cash_amount,
+        ...bankAccounts.map((ba) => s.bank_allocations[String(ba.id)] || 0),
+        s.deferred_amount,
+        s.discount_amount,
+      ];
+    });
+
+    body.push([
+      "Нийт",
+      ttl.total_amount,
+      ttl.cash_amount,
+      ...bankAccounts.map((ba) => ttl.bank[String(ba.id)] || 0),
+      ttl.deferred_amount,
+      ttl.discount_amount,
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...body]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Нэгтгэл");
+
+    const parts: string[] = ["neltgel_export"];
+    if (fromDate) parts.push("from_" + fromDate.toISOString().slice(0, 10));
+    if (toDate) parts.push("to_" + toDate.toISOString().slice(0, 10));
+    XLSX.writeFile(wb, parts.join("_") + ".xlsx");
+  };
+
   return (
     <div>
-      <h1 className="text-lg font-medium">Нэгтгэл</h1>
-      <p className="text-sm text-muted-foreground mt-1">Нийт: {total} өдөр</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-medium">Нэгтгэл</h1>
+          <p className="text-sm text-muted-foreground mt-1">Нийт: {total} өдөр</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportPdf} disabled={data.length === 0}>
+            PDF экспорт
+          </Button>
+          <Button variant="outline" onClick={exportExcel} disabled={data.length === 0}>
+            Excel экспорт
+          </Button>
+        </div>
+      </div>
       <Separator className="my-4" />
 
       <div className="flex flex-wrap gap-2 mb-4 items-end">

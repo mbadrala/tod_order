@@ -150,6 +150,8 @@ $saleController = new SaleController($pdo);
 
 $app->group('/sales', function (RouteCollectorProxy $group) use ($saleController) {
     $group->get('/admin-summary', [$saleController, 'listSummary']);
+    $group->get('/admin-summary/all', [$saleController, 'summaryAll']);
+    $group->get('/admin-summary/pdf', [$saleController, 'summaryPdf']);
     $group->get('', [$saleController, 'list']);
     $group->post('', [$saleController, 'create']);
     $group->get('/report', [$saleController, 'report']);

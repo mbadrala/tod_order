@@ -420,6 +420,15 @@ export async function getSalesSummary(filters: SaleSummaryFilters = {}) {
   return request<{ data: SaleSummary[]; total: number; page: number; per_page: number }>(`/sales/admin-summary${qs ? `?${qs}` : ''}`)
 }
 
+export async function getSalesSummaryAll(filters: Omit<SaleSummaryFilters, 'page' | 'per_page'> = {}) {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== '') params.set(k, String(v))
+  }
+  const qs = params.toString()
+  return request<SaleSummary[]>(`/sales/admin-summary/all${qs ? `?${qs}` : ''}`)
+}
+
 export async function toggleSaleLock(id: number): Promise<{ is_locked: number }> {
   return request(`/sales/${id}/lock`, { method: 'POST' })
 }
