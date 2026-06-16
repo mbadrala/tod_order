@@ -7,6 +7,7 @@ import {
   type SortingState,
   type ColumnDef,
 } from "@tanstack/react-table";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -37,7 +38,22 @@ import {
 } from "@/components/ui/pagination";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ClientSelect } from "@/components/ui/client-select";
-import { getPageNumbers } from "@/lib/utils";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverPortal,
+  PopoverPositioner,
+  PopoverPopup,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
+import { cn, getPageNumbers, formatDateLocal } from "@/lib/utils";
 import {
   getSales,
   getSale,
@@ -75,6 +91,73 @@ const emptyLine = (): LineItemForm => ({
   unit_price: 0,
 });
 
+function ProductSelect({
+  value,
+  onSelect,
+  products,
+}: {
+  value: string;
+  onSelect: (code: string, name: string) => void;
+  products: { code: string; name: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  const selected = products.find((p) => p.code === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger render={
+        <div
+          role="combobox"
+          aria-expanded={open}
+          className="flex w-full cursor-pointer items-center rounded border px-2 py-1.5 text-xs outline-none focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50"
+        >
+          <span className={cn("flex-1", !value && "text-muted-foreground")}>
+            {selected ? `${selected.code} - ${selected.name}` : "Код"}
+          </span>
+          <ChevronDownIcon className="size-3 shrink-0 opacity-50" />
+        </div>
+      } />
+      <PopoverPortal>
+        <PopoverPositioner align="start" className="min-w-60">
+          <PopoverPopup className="p-0">
+            <Command>
+              <CommandInput placeholder="Бараа хайх..." />
+              <CommandList>
+                <CommandEmpty>Бараа олдсонгүй</CommandEmpty>
+                <CommandGroup>
+                  {products.map((p) => {
+                    const cmdValue = `${p.code} ${p.name}`;
+                    return (
+                      <CommandItem
+                        key={p.code}
+                        value={cmdValue}
+                        onSelect={() => {
+                          onSelect(p.code, p.name);
+                          setOpen(false);
+                        }}
+                      >
+                        <CheckIcon
+                          className={cn(
+                            "mr-2 size-4",
+                            p.code === value ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                        <span className="font-medium text-muted-foreground shrink-0">{p.code}</span>
+                        <span className="ml-2 truncate">{p.name}</span>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverPopup>
+        </PopoverPositioner>
+      </PopoverPortal>
+    </Popover>
+  );
+}
+
 function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [total, setTotal] = useState(0);
@@ -95,7 +178,9 @@ function SalesPage() {
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [slipNumber, setSlipNumber] = useState("");
-  const [items, setItems] = useState<LineItemForm[]>(Array.from({length: 5}, () => emptyLine()));
+  const [items, setItems] = useState<LineItemForm[]>(
+    Array.from({ length: 5 }, () => emptyLine()),
+  );
   const [cashAmount, setCashAmount] = useState(0);
   const [deferredAmount, setDeferredAmount] = useState(0);
   const [discountEnabled, setDiscountEnabled] = useState(false);
@@ -114,27 +199,32 @@ function SalesPage() {
   const currentUserId = JSON.parse(localStorage.getItem("user") || "{}").id;
   const perPage = 50;
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
-  const load = useCallback(async (p: number) => {
-    setLoading(true);
-    try {
-      const res = await getSales({
-        client_name: searchClientName,
-        slip_number: searchSlipNumber,
-        total_min: searchTotalMin || undefined,
-        total_max: searchTotalMax || undefined,
-        page: p,
-        per_page: perPage,
-      });
-      setSales(res.data);
-      setTotal(res.total);
-      setPage(res.page);
-    } catch {
-      /* ignore */
-    }
-    setLoading(false);
-  }, [searchClientName, searchSlipNumber, searchTotalMin, searchTotalMax]);
+  const load = useCallback(
+    async (p: number) => {
+      setLoading(true);
+      try {
+        const res = await getSales({
+          client_name: searchClientName,
+          slip_number: searchSlipNumber,
+          total_min: searchTotalMin || undefined,
+          total_max: searchTotalMax || undefined,
+          page: p,
+          per_page: perPage,
+        });
+        setSales(res.data);
+        setTotal(res.total);
+        setPage(res.page);
+      } catch {
+        /* ignore */
+      }
+      setLoading(false);
+    },
+    [searchClientName, searchSlipNumber, searchTotalMin, searchTotalMax],
+  );
 
   useEffect(() => {
     clearTimeout(searchTimer.current);
@@ -143,7 +233,13 @@ function SalesPage() {
       load(1);
     }, 300);
     return () => clearTimeout(searchTimer.current);
-  }, [searchClientName, searchSlipNumber, searchTotalMin, searchTotalMax, load]);
+  }, [
+    searchClientName,
+    searchSlipNumber,
+    searchTotalMin,
+    searchTotalMax,
+    load,
+  ]);
 
   // Load reference data once on mount
   useEffect(() => {
@@ -169,7 +265,7 @@ function SalesPage() {
     setClientName("");
     setClientPhone("");
     setSlipNumber("");
-    setItems(Array.from({length: 5}, () => emptyLine()));
+    setItems(Array.from({ length: 5 }, () => emptyLine()));
     setCashAmount(0);
     setDeferredAmount(0);
     setDiscountEnabled(false);
@@ -272,9 +368,9 @@ function SalesPage() {
 
   const dateStr = useMemo(() => {
     try {
-      return saleDate.toISOString().slice(0, 10);
+      return formatDateLocal(saleDate);
     } catch {
-      return new Date().toISOString().slice(0, 10);
+      return formatDateLocal(new Date());
     }
   }, [saleDate]);
 
@@ -302,7 +398,7 @@ function SalesPage() {
         status,
         cash_amount: cashAmount || 0,
         deferred_amount: deferredAmount || 0,
-        discount_amount: discountEnabled ? (discountAmount || 0) : 0,
+        discount_amount: discountEnabled ? discountAmount || 0 : 0,
         items: items.map((i) => ({
           product_code: i.product_code,
           product_name: i.product_name,
@@ -411,7 +507,8 @@ function SalesPage() {
     {
       id: "items_count",
       header: "Мөр",
-      cell: ({ row }) => row.original.items_count ?? (row.original.items?.length ?? "-"),
+      cell: ({ row }) =>
+        row.original.items_count ?? row.original.items?.length ?? "-",
     },
     {
       id: "user_name",
@@ -424,9 +521,11 @@ function SalesPage() {
       header: "Үйлдэл",
       cell: ({ row }) => (
         <div className="flex gap-1">
-          {(isAdmin || row.original.user_id === currentUserId) && (
-            row.original.is_locked && !isAdmin ? (
-              <span className="text-xs text-muted-foreground px-2">Түгжигдсэн</span>
+          {(isAdmin || row.original.user_id === currentUserId) &&
+            (row.original.is_locked && !isAdmin ? (
+              <span className="text-xs text-muted-foreground px-2">
+                Түгжигдсэн
+              </span>
             ) : (
               <Button
                 variant="outline"
@@ -435,8 +534,7 @@ function SalesPage() {
               >
                 Засах
               </Button>
-            )
-          )}
+            ))}
           {isAdmin && (
             <Button
               variant="outline"
@@ -568,8 +666,12 @@ function SalesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/50 text-left text-xs text-muted-foreground">
-                      <th className="px-2 py-2 font-medium w-1/6">Барааны код</th>
-                      <th className="px-2 py-2 font-medium w-3/6">Барааны нэр</th>
+                      <th className="px-2 py-2 font-medium w-1/6">
+                        Барааны код
+                      </th>
+                      <th className="px-2 py-2 font-medium w-3/6">
+                        Барааны нэр
+                      </th>
                       <th className="px-2 py-2 font-medium text-right">
                         Ширхэг
                       </th>
@@ -582,14 +684,17 @@ function SalesPage() {
                     {items.map((item, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="px-2 py-1.5 w-1/6 min-w-40">
-                          <input
-                            list="product-codes"
-                            placeholder="Код"
+                          <ProductSelect
                             value={item.product_code}
-                            onChange={(e) =>
-                              updateItem(idx, "product_code", e.target.value)
-                            }
-                            className="w-full rounded border px-2 py-1.5 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
+                            onSelect={(code, name) => {
+                              setItems((prev) => {
+                                const next = prev.map((it, i) =>
+                                  i === idx ? { ...it, product_code: code, product_name: name } : it,
+                                );
+                                return next;
+                              });
+                            }}
+                            products={products}
                           />
                         </td>
                         <td className="px-2 py-1.5 w-3/6">
@@ -648,16 +753,6 @@ function SalesPage() {
                   </tbody>
                 </table>
               </div>
-
-              <datalist id="product-codes">
-                {products.map((p) => (
-                  <option
-                    key={p.id}
-                    value={p.code}
-                    label={`${p.code} - ${p.name}`}
-                  />
-                ))}
-              </datalist>
 
               <div className="mt-3 flex justify-end border-t pt-3">
                 <div className="text-sm font-semibold tabular-nums">
@@ -723,9 +818,15 @@ function SalesPage() {
                     <span className="text-xs text-muted-foreground">₮</span>
                   </div>
                 </div>
-                <div className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${discountEnabled ? "border-green-200 bg-green-50" : "border-muted bg-muted/30"}`}>
+                <div
+                  className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${discountEnabled ? "border-green-200 bg-green-50" : "border-muted bg-muted/30"}`}
+                >
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${discountEnabled ? "" : "text-muted-foreground"}`}>Хөнгөлөлт</p>
+                    <p
+                      className={`text-sm ${discountEnabled ? "" : "text-muted-foreground"}`}
+                    >
+                      Хөнгөлөлт
+                    </p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -734,7 +835,9 @@ function SalesPage() {
                       step="100"
                       value={discountAmount}
                       disabled={!discountEnabled}
-                      onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                      onChange={(e) =>
+                        setDiscountAmount(Number(e.target.value))
+                      }
                       className="w-28 rounded border px-2 py-1 text-right text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/50 tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <span className="text-xs text-muted-foreground">₮</span>
@@ -800,8 +903,11 @@ function SalesPage() {
                   )}
                   {allocTotal < totalSum - discountAmount && (
                     <span className="ml-2 text-xs font-normal">
-                      ({(totalSum - discountAmount - allocTotal).toLocaleString("mn-MN")} ₮
-                      дутуу)
+                      (
+                      {(totalSum - discountAmount - allocTotal).toLocaleString(
+                        "mn-MN",
+                      )}{" "}
+                      ₮ дутуу)
                     </span>
                   )}
                 </div>
@@ -895,8 +1001,7 @@ function SalesPage() {
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
         <span>Нийт: {total} мөр</span>
         <span>
-          {(page - 1) * perPage + 1}–
-          {Math.min(page * perPage, total)} / {total}
+          {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} / {total}
         </span>
       </div>
 
@@ -906,7 +1011,11 @@ function SalesPage() {
             <PaginationItem>
               <PaginationPrevious
                 onClick={() => goPage(page - 1)}
-                className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                className={
+                  page <= 1
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
               />
             </PaginationItem>
             {getPageNumbers(page, pageCount).map((p, i) =>
@@ -924,12 +1033,16 @@ function SalesPage() {
                     {p}
                   </PaginationLink>
                 </PaginationItem>
-              )
+              ),
             )}
             <PaginationItem>
               <PaginationNext
                 onClick={() => goPage(page + 1)}
-                className={page >= pageCount ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                className={
+                  page >= pageCount
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
               />
             </PaginationItem>
           </PaginationContent>
