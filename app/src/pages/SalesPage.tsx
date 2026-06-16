@@ -95,7 +95,7 @@ function SalesPage() {
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [slipNumber, setSlipNumber] = useState("");
-  const [items, setItems] = useState<LineItemForm[]>([emptyLine()]);
+  const [items, setItems] = useState<LineItemForm[]>(Array.from({length: 5}, () => emptyLine()));
   const [cashAmount, setCashAmount] = useState(0);
   const [deferredAmount, setDeferredAmount] = useState(0);
   const [discountEnabled, setDiscountEnabled] = useState(false);
@@ -169,7 +169,7 @@ function SalesPage() {
     setClientName("");
     setClientPhone("");
     setSlipNumber("");
-    setItems([emptyLine()]);
+    setItems(Array.from({length: 5}, () => emptyLine()));
     setCashAmount(0);
     setDeferredAmount(0);
     setDiscountEnabled(false);
