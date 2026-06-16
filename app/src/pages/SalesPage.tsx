@@ -514,7 +514,7 @@ function SalesPage() {
       >
         <DialogPortal>
           <DialogBackdrop />
-          <DialogPopup className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogPopup className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
             <DialogTitle>
               {editId ? "Борлуулалт засах" : "Шинэ борлуулалт"}
             </DialogTitle>
@@ -568,8 +568,8 @@ function SalesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/50 text-left text-xs text-muted-foreground">
-                      <th className="px-2 py-2 font-medium">Барааны код</th>
-                      <th className="px-2 py-2 font-medium">Барааны нэр</th>
+                      <th className="px-2 py-2 font-medium w-1/6">Барааны код</th>
+                      <th className="px-2 py-2 font-medium w-3/6">Барааны нэр</th>
                       <th className="px-2 py-2 font-medium text-right">
                         Ширхэг
                       </th>
@@ -581,7 +581,7 @@ function SalesPage() {
                   <tbody>
                     {items.map((item, idx) => (
                       <tr key={idx} className="border-t">
-                        <td className="px-2 py-1.5">
+                        <td className="px-2 py-1.5 w-1/6 min-w-40">
                           <input
                             list="product-codes"
                             placeholder="Код"
@@ -592,7 +592,7 @@ function SalesPage() {
                             className="w-full rounded border px-2 py-1.5 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
                           />
                         </td>
-                        <td className="px-2 py-1.5">
+                        <td className="px-2 py-1.5 w-3/6">
                           <input
                             placeholder="Нэр"
                             value={item.product_name}
@@ -602,7 +602,7 @@ function SalesPage() {
                             className="w-full rounded border px-2 py-1.5 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
                           />
                         </td>
-                        <td className="px-2 py-1.5">
+                        <td className="px-2 py-1.5 text-right">
                           <input
                             type="number"
                             min="0"
@@ -611,10 +611,10 @@ function SalesPage() {
                             onChange={(e) =>
                               updateItem(idx, "amount", Number(e.target.value))
                             }
-                            className="w-16 rounded border px-2 py-1.5 text-right text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
+                            className="w-full min-w-12 max-w-24 rounded border px-2 py-1.5 text-right text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
                           />
                         </td>
-                        <td className="px-2 py-1.5">
+                        <td className="px-2 py-1.5 text-right">
                           <input
                             type="number"
                             min="0"
@@ -627,7 +627,7 @@ function SalesPage() {
                                 Number(e.target.value),
                               )
                             }
-                            className="w-24 rounded border px-2 py-1.5 text-right text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
+                            className="w-full min-w-16 max-w-28 rounded border px-2 py-1.5 text-right text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/50"
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right font-medium tabular-nums">
