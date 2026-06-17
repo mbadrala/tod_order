@@ -722,6 +722,7 @@ class SaleController
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             foreach ($items as $item) {
+                if (empty(trim($item['product_code'] ?? ''))) continue;
                 $stmt->execute([
                     $saleId,
                     $item['product_code'] ?? '',
@@ -864,6 +865,7 @@ class SaleController
                     VALUES (?, ?, ?, ?, ?, ?)
                 ");
                 foreach ($items as $item) {
+                    if (empty(trim($item['product_code'] ?? ''))) continue;
                     $stmtItem->execute([
                         $args['id'],
                         $item['product_code'] ?? '',
@@ -1048,6 +1050,7 @@ class SaleController
         ");
 
         foreach ($items as $item) {
+            if (empty(trim($item['product_code']))) continue;
             $stmt->execute([
                 $saleId,
                 $sale['sale_date'],

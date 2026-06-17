@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -36,6 +36,66 @@ function SalesSummaryPage() {
   const [clientPhone, setClientPhone] = useState("");
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
+  const headerSentinelRef = useRef<HTMLDivElement>(null);
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const [headerPos, setHeaderPos] = useState({ left: 0, width: 0 });
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [colWidths, setColWidths] = useState<number[]>([]);
+
+  const measureColWidths = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+    const ths = wrapper.querySelectorAll<HTMLElement>("thead th");
+    setColWidths(Array.from(ths).map((th) => th.getBoundingClientRect().width));
+  }, []);
+
+  const updateHeaderPos = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+    const r = wrapper.getBoundingClientRect();
+    setHeaderPos({ left: r.left, width: r.width });
+  }, []);
+
+  const onScroll = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+    setScrollLeft(wrapper.scrollLeft);
+  }, []);
+
+  const onDataReady = useCallback(() => {
+    measureColWidths();
+    updateHeaderPos();
+  }, [measureColWidths, updateHeaderPos]);
+
+  useEffect(() => {
+    const el = headerSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyHeader(!entry.isIntersecting);
+        updateHeaderPos();
+      },
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    window.addEventListener("resize", onDataReady);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", onDataReady);
+    };
+  }, [updateHeaderPos, onDataReady]);
+
+  useEffect(() => {
+    if (!loading && data.length > 0) {
+      onDataReady();
+      const wrapper = tableWrapperRef.current;
+      if (wrapper) {
+        wrapper.addEventListener("scroll", onScroll);
+        return () => wrapper.removeEventListener("scroll", onScroll);
+      }
+    }
+  }, [loading, data, onDataReady, onScroll]);
 
   useEffect(() => {
     getBankAccounts().then(setBankAccounts);
@@ -158,6 +218,7 @@ function SalesSummaryPage() {
         </div>
       </div>
       <Separator className="my-4" />
+      <div ref={headerSentinelRef} className="h-px" />
 
       <div className="flex flex-wrap gap-2 mb-4 items-end">
         <div className="flex flex-col gap-1">
@@ -184,7 +245,41 @@ function SalesSummaryPage() {
         </div>
       </div>
 
-      <div className="rounded-md border overflow-x-auto">
+      {showStickyHeader && (
+        <div
+          className="fixed top-0 z-40 overflow-hidden bg-background shadow-md"
+          style={{ left: headerPos.left, width: headerPos.width }}
+        >
+          <table className="w-full text-xs" style={{ tableLayout: "fixed", marginLeft: -scrollLeft }}>
+            {colWidths.length > 0 && (
+              <colgroup>
+                {colWidths.map((w, i) => (
+                  <col key={i} style={{ width: w, minWidth: w }} />
+                ))}
+              </colgroup>
+            )}
+            <thead>
+              <tr className="border-b">
+                <th className="h-10 px-2 text-left align-middle font-medium whitespace-nowrap">Огноо</th>
+                <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Дүн</th>
+                <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Бэлэн</th>
+                {bankAccounts.map((ba) => (
+                  <th key={ba.id} className="h-10 px-2 text-center align-middle font-medium whitespace-nowrap">
+                    <div className="flex flex-col items-center">
+                      <span>{ba.bank_name}</span>
+                      {ba.account_name && <span className="text-muted-foreground">({ba.account_name})</span>}
+                    </div>
+                  </th>
+                ))}
+                <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Дараа төлбөр</th>
+                <th className="h-10 px-2 text-right align-middle font-medium whitespace-nowrap">Хөнгөлөлт</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+      )}
+
+      <div className="rounded-md border overflow-x-auto" ref={tableWrapperRef}>
         <table className="w-full caption-bottom text-sm">
           <thead>
             <tr className="border-b">

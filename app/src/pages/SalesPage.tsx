@@ -399,12 +399,14 @@ function SalesPage() {
         cash_amount: cashAmount || 0,
         deferred_amount: deferredAmount || 0,
         discount_amount: discountEnabled ? discountAmount || 0 : 0,
-        items: items.map((i) => ({
-          product_code: i.product_code,
-          product_name: i.product_name,
-          amount: i.amount,
-          unit_price: i.unit_price,
-        })),
+        items: items
+          .filter((i) => i.product_code.trim())
+          .map((i) => ({
+            product_code: i.product_code,
+            product_name: i.product_name,
+            amount: i.amount,
+            unit_price: i.unit_price,
+          })),
         bank_allocations: allocations
           .filter((a) => a.amount > 0)
           .map((a) => ({

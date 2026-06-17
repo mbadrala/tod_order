@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Lock, LockOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -106,6 +106,66 @@ function ReportsPage() {
     name: string;
   } | null>(null);
   const [lockLoadingId, setLockLoadingId] = useState<number | null>(null);
+  const headerSentinelRef = useRef<HTMLDivElement>(null);
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const [headerPos, setHeaderPos] = useState({ left: 0, width: 0 });
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [colWidths, setColWidths] = useState<number[]>([]);
+
+  const measureColWidths = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+    const ths = wrapper.querySelectorAll<HTMLElement>("thead th");
+    setColWidths(Array.from(ths).map((th) => th.getBoundingClientRect().width));
+  }, []);
+
+  const updateHeaderPos = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+    const r = wrapper.getBoundingClientRect();
+    setHeaderPos({ left: r.left, width: r.width });
+  }, []);
+
+  const onScroll = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+    setScrollLeft(wrapper.scrollLeft);
+  }, []);
+
+  const onDataReady = useCallback(() => {
+    measureColWidths();
+    updateHeaderPos();
+  }, [measureColWidths, updateHeaderPos]);
+
+  useEffect(() => {
+    const el = headerSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyHeader(!entry.isIntersecting);
+        updateHeaderPos();
+      },
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    window.addEventListener("resize", onDataReady);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", onDataReady);
+    };
+  }, [updateHeaderPos, onDataReady]);
+
+  useEffect(() => {
+    if (!loading && data.length > 0) {
+      onDataReady();
+      const wrapper = tableWrapperRef.current;
+      if (wrapper) {
+        wrapper.addEventListener("scroll", onScroll);
+        return () => wrapper.removeEventListener("scroll", onScroll);
+      }
+    }
+  }, [loading, data, onDataReady, onScroll]);
 
   const loadMeta = async () => {
     try {
@@ -415,6 +475,55 @@ function ReportsPage() {
 
   return (
     <div className="mx-auto max-w-full">
+      {showStickyHeader && (
+        <div
+          className="fixed top-0 z-40 overflow-hidden bg-background shadow-md"
+          style={{ left: headerPos.left, width: headerPos.width }}
+        >
+          <table className="w-full text-xs" style={{ tableLayout: "fixed", marginLeft: -scrollLeft }}>
+            {colWidths.length > 0 && (
+              <colgroup>
+                {colWidths.map((w, i) => (
+                  <col key={i} style={{ width: w, minWidth: w }} />
+                ))}
+              </colgroup>
+            )}
+            <thead>
+              <tr className="bg-muted/50 text-left text-muted-foreground">
+                <th className="whitespace-nowrap px-2 py-2 font-medium">Огноо</th>
+                {isAdmin() && (
+                  <th className="whitespace-nowrap px-2 py-2 font-medium">Түгжээ</th>
+                )}
+                <th className="whitespace-nowrap px-2 py-2 font-medium">Харилцагчийн код</th>
+                <th className="px-2 py-2 font-medium" style={{ minWidth: 180 }}>Харилцагчийн нэр</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium">Утасны дугаар</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium">Падааны дугаар</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium">Барааны код</th>
+                <th className="px-2 py-2 font-medium" style={{ minWidth: 300 }}>Барааны нэр</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Тоо хэмжээ</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Нэгж үнэ</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Дүн</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Бэлэн</th>
+                {bankAccounts.map((ba) => (
+                  <th key={ba.id} className="whitespace-nowrap px-2 py-2 font-medium text-center">
+                    <div className="flex flex-col items-center">
+                      <span>{ba.bank_name}</span>
+                      {ba.account_name && <span className="text-muted-foreground">({ba.account_name})</span>}
+                    </div>
+                  </th>
+                ))}
+                <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Дараа төлбөр</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium text-right">Хөнгөлөлт</th>
+                <th className="px-2 py-2 font-medium">Бүртгэсэн ажилтан</th>
+                <th className="whitespace-nowrap px-2 py-2 font-medium">Бүртгэсэн огноо</th>
+                {isAdmin() && (
+                  <th className="whitespace-nowrap px-2 py-2 font-medium">Үйлдэл</th>
+                )}
+              </tr>
+            </thead>
+          </table>
+        </div>
+      )}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Тайлан</h1>
         <div className="flex gap-2">
@@ -611,6 +720,7 @@ function ReportsPage() {
       </div>
 
       <Separator className="mb-4" />
+      <div ref={headerSentinelRef} className="h-px" />
 
       {loading ? (
         <p className="py-8 text-center text-muted-foreground">Уншиж байна...</p>
@@ -619,7 +729,7 @@ function ReportsPage() {
           Илэрц олдсонгүй
         </p>
       ) : (
-        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div ref={tableWrapperRef} className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-muted/50 text-left text-muted-foreground">
@@ -634,7 +744,7 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
                   Харилцагчийн код
                 </th>
-                <th className="px-2 py-2 font-medium">
+                <th className="px-2 py-2 font-medium" style={{ minWidth: 180 }}>
                   Харилцагчийн нэр
                 </th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
@@ -646,7 +756,7 @@ function ReportsPage() {
                 <th className="whitespace-nowrap px-2 py-2 font-medium">
                   Барааны код
                 </th>
-                <th className="px-2 py-2 font-medium">
+                <th className="px-2 py-2 font-medium" style={{ minWidth: 300 }}>
                   Барааны нэр
                 </th>
                 <th className="whitespace-nowrap px-2 py-2 font-medium text-right">
@@ -695,7 +805,7 @@ function ReportsPage() {
             <tbody>
               {(() => {
                 const seenSaleIds = new Set<number>();
-                return flatRows.map((r) => {
+                return flatRows.map((r, idx) => {
                   const isFirst = !seenSaleIds.has(r.sale_id);
                   if (isFirst) seenSaleIds.add(r.sale_id);
                   const span = isFirst
@@ -703,7 +813,7 @@ function ReportsPage() {
                     : 0;
                   return (
                     <tr
-                      key={`${r.sale_id}-${r.product_code}`}
+                      key={`${r.sale_id}-${r.product_code || idx}`}
                       className="border-t"
                     >
                       {isFirst ? (
