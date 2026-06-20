@@ -110,6 +110,8 @@ function ProductSelect({
         <div
           role="combobox"
           aria-expanded={open}
+          tabIndex={0}
+          onFocus={() => setOpen(true)}
           className="flex w-full cursor-pointer items-center rounded border px-2 py-1.5 text-xs outline-none focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50"
         >
           <span className={cn("flex-1", !value && "text-muted-foreground")}>

@@ -25,7 +25,7 @@ export function ClientSelect({ clients, selectedCode, selectedName, selectedPhon
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger disabled={disabled} render={
-        <Button variant="outline" role="combobox" aria-expanded={open}
+        <Button variant="outline" role="combobox" aria-expanded={open} onFocus={() => setOpen(true)}
           className={cn('w-full justify-between font-normal', !selectedName && !selectedCode && 'text-muted-foreground')}>
           {displayName}
           {selectedPhone && <span className="ml-2 text-xs text-muted-foreground">{selectedPhone}</span>}
