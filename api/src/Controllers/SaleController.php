@@ -261,7 +261,8 @@ class SaleController
         $total = (int)$countStmt->fetchColumn();
 
         $offset = ($page - 1) * $perPage;
-        $sql = "SELECT s.*, u.name AS user_name, COUNT(si.id) AS items_count
+        $sql = "SELECT s.*, u.name AS user_name, COUNT(si.id) AS items_count,
+                (SELECT COALESCE(SUM(amount), 0) FROM sale_bank_allocations WHERE sale_id = s.id) AS bank_total
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.id
                 LEFT JOIN sale_items si ON si.sale_id = s.id
@@ -287,6 +288,7 @@ class SaleController
                 $sale['cash_amount'] = 0;
                 $sale['deferred_amount'] = 0;
                 $sale['discount_amount'] = 0;
+                $sale['bank_total'] = 0;
             }
         }
         unset($sale);
@@ -695,8 +697,13 @@ class SaleController
             unset($a);
         }
 
-        if ($status === 'final' && $allocTotal < $totalAmount - $discountAmount) {
-            return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+        if ($status === 'final') {
+            if ($allocTotal < $totalAmount - $discountAmount) {
+                return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+            }
+            if ($allocTotal > $totalAmount - $discountAmount) {
+                return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс их байна'], 400);
+            }
         }
 
         if (!$request->getAttribute('is_admin') && is_array($bankAllocations) && !empty($bankAllocations)) {
@@ -849,8 +856,13 @@ class SaleController
                 unset($a);
             }
 
-            if ($status === 'final' && $allocTotal < $totalAmount - $discountAmount) {
-                return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+            if ($status === 'final') {
+                if ($allocTotal < $totalAmount - $discountAmount) {
+                    return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+                }
+                if ($allocTotal > $totalAmount - $discountAmount) {
+                    return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс их байна'], 400);
+                }
             }
 
             $set[] = "total_amount = ?";
@@ -922,6 +934,9 @@ class SaleController
 
                 if ($allocTotal < $existingTotal - $discountAmount) {
                     return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс бага байна'], 400);
+                }
+                if ($allocTotal > $existingTotal - $discountAmount) {
+                    return $this->json($response, ['error' => 'Хуваарилалтын дүн нийт дүнгээс их байна'], 400);
                 }
 
                 $this->pdo->prepare("DELETE FROM sale_bank_allocations WHERE sale_id = ?")->execute([$args['id']]);

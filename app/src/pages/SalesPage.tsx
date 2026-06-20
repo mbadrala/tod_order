@@ -384,9 +384,15 @@ function SalesPage() {
       setError("Дор хаяж нэг бараа оруулна уу");
       return;
     }
-    if (status === "final" && allocTotal < totalSum - discountAmount) {
-      setError("Хуваарилалтын дүн нийт дүнгээс бага байна");
-      return;
+    if (status === "final") {
+      if (allocTotal < totalSum - discountAmount) {
+        setError("Хуваарилалтын дүн нийт дүнгээс бага байна");
+        return;
+      }
+      if (allocTotal > totalSum - discountAmount) {
+        setError("Хуваарилалтын дүн нийт дүнгээс их байна");
+        return;
+      }
     }
     try {
       const payload = {
@@ -504,6 +510,23 @@ function SalesPage() {
       cell: ({ getValue }) => {
         const v = getValue() as number;
         return v.toLocaleString("mn-MN") + " ₮";
+      },
+    },
+    {
+      id: "diff",
+      header: "Зөрүү",
+      cell: ({ row }) => {
+        const s = row.original;
+        const allocTotal = (s.cash_amount || 0) + (s.deferred_amount || 0) + (s.bank_total || 0);
+        const required = (s.total_amount || 0) - (s.discount_amount || 0);
+        const diff = allocTotal - required;
+        if (diff === 0) return <span className="text-xs text-muted-foreground">0 ₮</span>;
+        const isOver = diff > 0;
+        return (
+          <span className={`text-xs font-medium tabular-nums ${isOver ? "text-destructive" : "text-amber-600"}`}>
+            {isOver ? "+" : ""}{diff.toLocaleString("mn-MN")} ₮
+          </span>
+        );
       },
     },
     {

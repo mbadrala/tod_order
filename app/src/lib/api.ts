@@ -208,6 +208,7 @@ export interface Sale {
   bank_allocations: SaleBankAllocation[]
   items_count?: number
   is_locked?: number
+  bank_total?: number
 }
 
 export interface SaleItem {

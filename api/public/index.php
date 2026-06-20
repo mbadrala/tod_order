@@ -27,11 +27,6 @@ initializeDatabase($pdo);
 seedAdmin($pdo);
 seedSuperAdmin($pdo);
 
-// TODO: remove after next deployment — cleans up empty sale_items from old bug
-$pdo->exec("DELETE FROM sale_items WHERE product_code IS NULL OR product_code = ''");
-// TODO: remove after next deployment — cleans up empty report entries from old bug
-$pdo->exec("DELETE FROM reports WHERE product_code IS NULL OR product_code = ''");
-
 $app = AppFactory::create();
 
 $allowedOrigins = $config['cors_allowed_origins'];
