@@ -72,7 +72,8 @@ class ProductController
         }
 
         $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
-        $stmt = $this->pdo->prepare("SELECT * FROM products $where ORDER BY name");
+        $binds[] = 100000;
+        $stmt = $this->pdo->prepare("SELECT * FROM products $where ORDER BY name LIMIT ?");
         $stmt->execute($binds);
         return $this->json($response, $stmt->fetchAll());
     }
