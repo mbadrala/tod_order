@@ -46,6 +46,7 @@ import {
   type ClientInput,
 } from "@/lib/api";
 import * as XLSX from "xlsx";
+import { Loader2 } from "lucide-react";
 import { getPageNumbers } from "@/lib/utils";
 
 function ClientsPage() {
@@ -69,6 +70,7 @@ function ClientsPage() {
   const [searchCode, setSearchCode] = useState("");
   const [searchName, setSearchName] = useState("");
   const [searchPhone, setSearchPhone] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const isAdmin = JSON.parse(localStorage.getItem("user") || "{}").is_admin;
   const perPage = 50;
 
@@ -188,6 +190,8 @@ function ClientsPage() {
   };
 
   const exportExcel = async () => {
+    setIsExporting(true);
+    try {
     const all = await getClientsAll({ code: searchCode, name: searchName, phone: searchPhone });
     const headers = [
       "Код",
@@ -224,6 +228,9 @@ function ClientsPage() {
       wb,
       `clients_export_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const columns: ColumnDef<Client>[] = [
@@ -367,7 +374,8 @@ function ClientsPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Харилцагчид</h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportExcel}>
+          <Button variant="outline" onClick={exportExcel} disabled={isExporting}>
+            {isExporting && <Loader2 className="mr-2 size-4 animate-spin" />}
             Excel экспорт
           </Button>
           <Button onClick={openCreate}>Шинэ харилцагч</Button>

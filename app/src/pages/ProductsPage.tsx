@@ -44,6 +44,7 @@ import {
   type ProductInput,
 } from "@/lib/api";
 import * as XLSX from "xlsx";
+import { Loader2 } from "lucide-react";
 import { getPageNumbers } from "@/lib/utils";
 
 function ProductsPage() {
@@ -64,6 +65,7 @@ function ProductsPage() {
   } | null>(null);
   const [searchCode, setSearchCode] = useState("");
   const [searchName, setSearchName] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdmin = user.is_admin;
   const perPage = 50;
@@ -93,6 +95,8 @@ function ProductsPage() {
   }, [searchCode, searchName, load]);
 
   const exportExcel = async () => {
+    setIsExporting(true);
+    try {
     const all = await getProductsAll({ code: searchCode, name: searchName });
     const headers = ["Код", "Нэр", "Бүртгэгдсэн"];
     const body = all.map((p) => [
@@ -107,6 +111,9 @@ function ProductsPage() {
       wb,
       `products_export_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const resetForm = () => {
@@ -239,7 +246,8 @@ function ProductsPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Бараа</h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportExcel}>
+          <Button variant="outline" onClick={exportExcel} disabled={isExporting}>
+            {isExporting && <Loader2 className="mr-2 size-4 animate-spin" />}
             Excel экспорт
           </Button>
           {isAdmin && <Button onClick={openCreate}>Шинэ бараа</Button>}

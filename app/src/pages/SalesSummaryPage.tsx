@@ -42,6 +42,7 @@ function SalesSummaryPage() {
   const [headerPos, setHeaderPos] = useState({ left: 0, width: 0 });
   const [scrollLeft, setScrollLeft] = useState(0);
   const [colWidths, setColWidths] = useState<number[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   const measureColWidths = useCallback(() => {
     const wrapper = tableWrapperRef.current;
@@ -144,6 +145,8 @@ function SalesSummaryPage() {
   };
 
   const exportExcel = async () => {
+    setIsExporting(true);
+    try {
     const filters: Record<string, string> = {};
     if (fromDate) filters.from = formatDateLocal(fromDate);
     if (toDate) filters.to = formatDateLocal(toDate);
@@ -199,6 +202,9 @@ function SalesSummaryPage() {
     if (fromDate) parts.push("from_" + fromDate.toISOString().slice(0, 10));
     if (toDate) parts.push("to_" + toDate.toISOString().slice(0, 10));
     XLSX.writeFile(wb, parts.join("_") + ".xlsx");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -212,7 +218,8 @@ function SalesSummaryPage() {
           <Button variant="outline" onClick={exportPdf} disabled={data.length === 0}>
             PDF экспорт
           </Button>
-          <Button variant="outline" onClick={exportExcel} disabled={data.length === 0}>
+          <Button variant="outline" onClick={exportExcel} disabled={data.length === 0 || isExporting}>
+            {isExporting && <Loader2 className="mr-2 size-4 animate-spin" />}
             Excel экспорт
           </Button>
         </div>

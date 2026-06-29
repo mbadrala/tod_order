@@ -122,12 +122,12 @@ class ReportController
         if (!empty($reports)) {
             $ids = array_column($reports, 'id');
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = $this->pdo->prepare("SELECT report_id, json_group_array(json_object('id', id, 'report_id', report_id, 'bank_account_id', bank_account_id, 'bank_name', bank_name, 'account_number', account_number, 'account_name', account_name, 'amount', amount)) AS bank_allocations_json FROM report_bank_allocations WHERE report_id IN ($placeholders) GROUP BY report_id");
+            $stmt = $this->pdo->prepare("SELECT * FROM report_bank_allocations WHERE report_id IN ($placeholders) ORDER BY id");
             $stmt->execute($ids);
-            $allocRows = $stmt->fetchAll();
+            $allAllocs = $stmt->fetchAll();
             $allocsByReport = [];
-            foreach ($allocRows as $row) {
-                $allocsByReport[$row['report_id']] = json_decode($row['bank_allocations_json'], true) ?? [];
+            foreach ($allAllocs as $a) {
+                $allocsByReport[$a['report_id']][] = $a;
             }
             foreach ($reports as &$r) {
                 $r['bank_allocations'] = $allocsByReport[$r['id']] ?? [];
@@ -239,34 +239,27 @@ class ReportController
 
         $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
-        $sql = "SELECT r.*, COALESCE(s.is_locked, 0) AS is_locked,
-            COALESCE(ba.bank_allocations_json, '[]') AS bank_allocations_json
-            FROM reports r
-            LEFT JOIN sales s ON r.sale_id = s.id
-            LEFT JOIN (
-                SELECT report_id, json_group_array(json_object(
-                    'id', id, 'report_id', report_id,
-                    'bank_account_id', bank_account_id,
-                    'bank_name', bank_name,
-                    'account_number', account_number,
-                    'account_name', account_name,
-                    'amount', amount
-                )) AS bank_allocations_json
-                FROM report_bank_allocations
-                GROUP BY report_id
-            ) ba ON ba.report_id = r.id
-            $where
-            ORDER BY r.sale_date DESC, r.id DESC
-            LIMIT ?";
-
         $binds[] = 100000;
-        $dataStmt = $this->pdo->prepare($sql);
+        $dataStmt = $this->pdo->prepare("SELECT r.*, COALESCE(s.is_locked, 0) AS is_locked FROM reports r LEFT JOIN sales s ON r.sale_id = s.id $where ORDER BY r.sale_date DESC, r.id DESC LIMIT ?");
         $dataStmt->execute($binds);
         $reports = $dataStmt->fetchAll();
 
-        foreach ($reports as &$r) {
-            $r['bank_allocations'] = json_decode($r['bank_allocations_json'], true) ?? [];
-            unset($r['bank_allocations_json']);
+        // attach bank allocations
+        if (!empty($reports)) {
+            $ids = array_column($reports, 'id');
+            $allocsByReport = [];
+            foreach (array_chunk($ids, 500) as $chunk) {
+                $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+                $stmt = $this->pdo->prepare("SELECT * FROM report_bank_allocations WHERE report_id IN ($placeholders) ORDER BY id");
+                $stmt->execute($chunk);
+                foreach ($stmt->fetchAll() as $a) {
+                    $allocsByReport[$a['report_id']][] = $a;
+                }
+            }
+            foreach ($reports as &$r) {
+                $r['bank_allocations'] = $allocsByReport[$r['id']] ?? [];
+            }
+            unset($r);
         }
 
         return $this->json($response, $reports);

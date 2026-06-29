@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverPortal, PopoverPositioner, PopoverPopup } from '@/components/ui/popover'
@@ -19,13 +19,23 @@ interface ClientSelectProps {
 
 export function ClientSelect({ clients, selectedCode, selectedName, selectedPhone, onSelect, placeholder = 'Харилцагч хайх...', valueKey = 'both', disabled }: ClientSelectProps) {
   const [open, setOpen] = useState(false)
+  const dismissedRef = useRef(false)
 
   const displayName = selectedName || selectedCode || placeholder
+  const hasValue = !!(selectedCode || selectedName)
+
+  const handleOpenChange = (v: boolean) => {
+    if (!v) {
+      dismissedRef.current = true
+      setTimeout(() => { dismissedRef.current = false }, 300)
+    }
+    setOpen(v)
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger disabled={disabled} render={
-        <Button variant="outline" role="combobox" aria-expanded={open} onFocus={() => setOpen(true)}
+        <Button variant="outline" role="combobox" aria-expanded={open} onFocus={() => { if (dismissedRef.current) return; if (!hasValue) setOpen(true) }}
           className={cn('w-full justify-between font-normal', !selectedName && !selectedCode && 'text-muted-foreground')}>
           {displayName}
           {selectedPhone && <span className="ml-2 text-xs text-muted-foreground">{selectedPhone}</span>}
@@ -49,6 +59,7 @@ export function ClientSelect({ clients, selectedCode, selectedName, selectedPhon
                         key={c.id}
                         value={cmdValue}
                         onSelect={() => {
+                          dismissedRef.current = false
                           onSelect({
                             client_code: c.client_code || '',
                             client_name: c.name,

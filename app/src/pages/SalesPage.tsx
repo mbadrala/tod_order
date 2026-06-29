@@ -101,17 +101,26 @@ function ProductSelect({
   products: { code: string; name: string }[];
 }) {
   const [open, setOpen] = useState(false);
+  const dismissedRef = useRef(false);
+
+  const handleOpenChange = (v: boolean) => {
+    if (!v) {
+      dismissedRef.current = true;
+      setTimeout(() => { dismissedRef.current = false }, 300);
+    }
+    setOpen(v);
+  };
 
   const selected = products.find((p) => p.code === value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger render={
         <div
           role="combobox"
           aria-expanded={open}
           tabIndex={0}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { if (dismissedRef.current) return; if (!value) setOpen(true) }}
           className="flex w-full cursor-pointer items-center rounded border px-2 py-1.5 text-xs outline-none focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50"
         >
           <span className={cn("flex-1", !value && "text-muted-foreground")}>
@@ -135,6 +144,7 @@ function ProductSelect({
                         key={p.code}
                         value={cmdValue}
                         onSelect={() => {
+                          dismissedRef.current = false;
                           onSelect(p.code, p.name);
                           setOpen(false);
                         }}
@@ -254,7 +264,12 @@ function SalesPage() {
         ]);
         setProducts(p);
         setClients(c);
-        setBankAccounts(b);
+        setBankAccounts([...b].sort((a, b) => {
+          const aLat = /^[A-Za-z]/.test(a.account_name);
+          const bLat = /^[A-Za-z]/.test(b.account_name);
+          if (aLat !== bLat) return aLat ? 1 : -1;
+          return a.account_name.localeCompare(b.account_name, 'mn');
+        }));
       } catch {
         /* ignore */
       }

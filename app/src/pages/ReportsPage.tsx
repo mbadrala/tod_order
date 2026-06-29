@@ -105,6 +105,7 @@ function ReportsPage() {
     sale_id: number;
     name: string;
   } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [lockLoadingId, setLockLoadingId] = useState<number | null>(null);
   const headerSentinelRef = useRef<HTMLDivElement>(null);
   const tableWrapperRef = useRef<HTMLDivElement>(null);
@@ -351,6 +352,8 @@ function ReportsPage() {
   };
 
   const exportExcel = async () => {
+    setIsExporting(true);
+    try {
     const filters: Record<string, any> = {};
     if (fromDate) filters.from = formatDateLocal(fromDate);
     if (toDate) filters.to = formatDateLocal(toDate);
@@ -418,7 +421,7 @@ function ReportsPage() {
     const discountCol = deferredCol + 1;
     const userCol = discountCol + 1;
     const createdAtCol = userCol + 1;
-    const saleLevelCols = [0, 1, 2, 3, 4, 10];
+    const saleLevelCols = [10];
     for (let c = bankAllocStart; c <= bankAllocEnd; c++) saleLevelCols.push(c);
     saleLevelCols.push(deferredCol, discountCol, userCol, createdAtCol);
 
@@ -471,6 +474,9 @@ function ReportsPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Тайлан");
     XLSX.writeFile(wb, `${exportName}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -537,8 +543,9 @@ function ReportsPage() {
           <Button
             variant="outline"
             onClick={exportExcel}
-            disabled={flatRows.length === 0}
+            disabled={flatRows.length === 0 || isExporting}
           >
+            {isExporting && <Loader2 className="mr-2 size-4 animate-spin" />}
             Excel экспорт
           </Button>
         </div>
